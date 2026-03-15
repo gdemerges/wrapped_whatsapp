@@ -109,6 +109,7 @@
 
             const slides = generateSlides(stats);
             renderSlides(slides);
+            buildSummary(stats);
             showScreen(wrappedScreen);
 
         } catch (err) {
@@ -304,5 +305,171 @@
             if (e.deltaY > 30) goToSlide(currentSlide + 1);
             else if (e.deltaY < -30) goToSlide(currentSlide - 1);
         }, { passive: true });
+    }
+
+    // ========== Summary ==========
+    const summaryOverlay = $('#summary-overlay');
+    const summaryContent = $('#summary-content');
+    const summaryBtn = $('#summary-btn');
+    const summaryClose = $('#summary-close');
+
+    summaryBtn.addEventListener('click', () => {
+        summaryOverlay.classList.add('active');
+    });
+
+    summaryClose.addEventListener('click', () => {
+        summaryOverlay.classList.remove('active');
+    });
+
+    summaryOverlay.addEventListener('click', (e) => {
+        if (e.target === summaryOverlay) summaryOverlay.classList.remove('active');
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') summaryOverlay.classList.remove('active');
+    });
+
+    function buildSummary(stats) {
+        const fmt = StatsEngine.fmt;
+        const fmtDate = StatsEngine.fmtDate;
+        const fmtTime = StatsEngine.fmtTime;
+
+        // --- Section: Vue d'ensemble ---
+        let html = `
+            <section class="summary-section">
+                <h3>Vue d'ensemble</h3>
+                <table class="summary-table">
+                    <tr><td>Periode</td><td>${fmtDate(stats.startDate)} — ${fmtDate(stats.endDate)}</td></tr>
+                    <tr><td>Duree</td><td>${stats.totalDays} jours</td></tr>
+                    <tr><td>Participants</td><td>${stats.participants}</td></tr>
+                    <tr><td>Total messages</td><td>${fmt(stats.totalMessages)}</td></tr>
+                    <tr><td>Moyenne / jour</td><td>${stats.avgPerDay}</td></tr>
+                    <tr><td>Total caracteres</td><td>${fmt(stats.totalChars)}</td></tr>
+                    <tr><td>Longueur moy. message</td><td>${stats.avgMsgLen} car.</td></tr>
+                    <tr><td>Medias partages</td><td>${fmt(stats.totalMedia)}</td></tr>
+                    <tr><td>Liens partages</td><td>${fmt(stats.totalLinks)}</td></tr>
+                    <tr><td>Messages modifies</td><td>${fmt(stats.totalEdited)}</td></tr>
+                    <tr><td>Emojis envoyes</td><td>${fmt(stats.emojis.total)} (${stats.emojis.unique} differents)</td></tr>
+                    <tr><td>Meilleur streak</td><td>${stats.streak.max} jours consecutifs</td></tr>
+                </table>
+            </section>
+        `;
+
+        // --- Section: Classement ---
+        html += `
+            <section class="summary-section">
+                <h3>Classement des participants</h3>
+                <table class="summary-table summary-table-full">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Nom</th>
+                            <th>Messages</th>
+                            <th>%</th>
+                            <th>Moy. car.</th>
+                            <th>Medias</th>
+                            <th>Emojis</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${stats.ranking.map(([name, data], i) => {
+                            const emojiCount = stats.emojis.perPerson.find(e => e[0] === name)?.[1] || 0;
+                            return `<tr>
+                                <td>${i + 1}</td>
+                                <td>${name}</td>
+                                <td>${fmt(data.count)}</td>
+                                <td>${data.percent}%</td>
+                                <td>${data.avgLen}</td>
+                                <td>${data.media}</td>
+                                <td>${fmt(emojiCount)}</td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </section>
+        `;
+
+        // --- Section: Activite ---
+        html += `
+            <section class="summary-section">
+                <h3>Activite</h3>
+                <table class="summary-table">
+                    <tr><td>Heure de pointe</td><td>${stats.peakHour}h</td></tr>
+                    <tr><td>Jour prefere</td><td>${stats.peakDay}</td></tr>
+                    <tr><td>Jour le plus actif</td><td>${new Date(stats.mostActiveDay[0]).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })} (${stats.mostActiveDay[1]} msgs)</td></tr>
+                </table>
+            </section>
+        `;
+
+        // --- Section: Top emojis ---
+        if (stats.emojis.top.length > 0) {
+            html += `
+                <section class="summary-section">
+                    <h3>Top emojis</h3>
+                    <div class="summary-emoji-list">
+                        ${stats.emojis.top.slice(0, 15).map(([emoji, count]) =>
+                            `<span class="summary-emoji">${emoji} <small>${fmt(count)}</small></span>`
+                        ).join('')}
+                    </div>
+                </section>
+            `;
+        }
+
+        // --- Section: Top mots ---
+        if (stats.topWords.length > 0) {
+            html += `
+                <section class="summary-section">
+                    <h3>Top 20 mots</h3>
+                    <table class="summary-table summary-table-compact">
+                        ${stats.topWords.slice(0, 20).map(([word, count], i) =>
+                            `<tr><td>${i + 1}.</td><td>${word}</td><td>${fmt(count)}</td></tr>`
+                        ).join('')}
+                    </table>
+                </section>
+            `;
+        }
+
+        // --- Section: Medias ---
+        const mediaLabels = { images: 'Images', gifs: 'GIFs', stickers: 'Stickers', videos: 'Videos', audio: 'Audios', documents: 'Documents', links: 'Liens' };
+        const mediaEntries = Object.entries(stats.mediaTypes).filter(([, v]) => v > 0);
+        if (mediaEntries.length > 0) {
+            html += `
+                <section class="summary-section">
+                    <h3>Medias</h3>
+                    <table class="summary-table">
+                        ${mediaEntries.sort((a, b) => b[1] - a[1]).map(([key, val]) =>
+                            `<tr><td>${mediaLabels[key] || key}</td><td>${fmt(val)}</td></tr>`
+                        ).join('')}
+                    </table>
+                </section>
+            `;
+        }
+
+        // --- Section: Fun facts ---
+        const facts = [];
+        if (stats.longestMessage?.msgLen > 0) {
+            facts.push(`Le plus long message : ${fmt(stats.longestMessage.msgLen)} caracteres par ${stats.longestMessage.author}`);
+        }
+        if (stats.nightOwl) facts.push(`Couche-tard : ${stats.nightOwl[0]} (${stats.nightOwl[1]} msgs entre 0h-5h)`);
+        if (stats.earlyBird) facts.push(`Leve-tot : ${stats.earlyBird[0]} (${stats.earlyBird[1]} msgs entre 5h-8h)`);
+        if (stats.responseStats?.fastest) {
+            facts.push(`Plus reactif : ${stats.responseStats.fastest[0]} (${fmtTime(stats.responseStats.fastest[1])} en moyenne)`);
+        }
+        if (stats.responseStats?.slowest) {
+            facts.push(`Plus lent a repondre : ${stats.responseStats.slowest[0]} (${fmtTime(stats.responseStats.slowest[1])} en moyenne)`);
+        }
+
+        if (facts.length > 0) {
+            html += `
+                <section class="summary-section">
+                    <h3>Fun facts</h3>
+                    <ul class="summary-facts">
+                        ${facts.map(f => `<li>${f}</li>`).join('')}
+                    </ul>
+                </section>
+            `;
+        }
+
+        summaryContent.innerHTML = html;
     }
 })();
