@@ -205,40 +205,49 @@
         }
     }
 
+    let isAnimating = false;
+
     function goToSlide(index) {
-        if (index < 0 || index >= totalSlides || index === currentSlide) return;
+        if (index < 0 || index >= totalSlides || index === currentSlide || isAnimating) return;
+        isAnimating = true;
 
-        const direction = index > currentSlide ? 1 : -1;
+        const goingForward = index > currentSlide;
+        const oldSlide = slideElements[currentSlide];
+        const newSlide = slideElements[index];
 
-        // Current slide exits
-        slideElements[currentSlide].classList.remove('active');
-        slideElements[currentSlide].classList.add(direction > 0 ? 'prev' : '');
-        if (direction < 0) {
-            slideElements[currentSlide].style.transform = 'translateX(100%)';
-        }
+        // Disable transitions temporarily to position the new slide off-screen
+        newSlide.style.transition = 'none';
+        newSlide.style.transform = goingForward ? 'translateX(100%)' : 'translateX(-100%)';
+        newSlide.style.opacity = '1';
+        newSlide.classList.add('active');
 
-        // Reset all non-active slides
+        // Force reflow so the position takes effect before we animate
+        newSlide.offsetHeight;
+
+        // Re-enable transitions and animate both slides
+        newSlide.style.transition = '';
+        newSlide.style.transform = 'translateX(0)';
+
+        oldSlide.style.transform = goingForward ? 'translateX(-100%)' : 'translateX(100%)';
+        oldSlide.style.opacity = '0';
+
+        // After animation completes, clean up
         setTimeout(() => {
-            slideElements.forEach((el, i) => {
-                if (i !== index) {
-                    el.classList.remove('active', 'prev');
-                    el.style.transform = '';
-                }
-            });
+            oldSlide.classList.remove('active');
+            oldSlide.style.transform = '';
+            oldSlide.style.opacity = '';
+            oldSlide.style.transition = '';
+            currentSlide = index;
+            isAnimating = false;
         }, 500);
-
-        // New slide enters
-        currentSlide = index;
-        slideElements[currentSlide].classList.remove('prev');
-        slideElements[currentSlide].classList.add('active');
 
         // Update dots
         navDots.querySelectorAll('.nav-dot').forEach((dot, i) => {
-            dot.classList.toggle('active', i === currentSlide);
+            dot.classList.toggle('active', i === index);
         });
 
         // Initialize chart
-        initChartForSlide(currentSlide);
+        initChartForSlide(index);
 
         // Hide swipe hint after first navigation
         const hint = $('#swipe-hint');

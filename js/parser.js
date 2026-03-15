@@ -122,7 +122,7 @@ const WhatsAppParser = {
                 const datetime = this.parseDate(dateStr, timeStr);
                 current = {
                     datetime,
-                    author: author.trim().replace(/[\u200e\u200f]/g, '').replace(/^~\s*/, ''),
+                    author: author.trim().replace(/[\u200e\u200f]/g, '').replace(/^~\s*/, '').replace(/\s+/g, ' ').trim(),
                     message: body.replace(/[\u200e\u200f]/g, ''),
                 };
             } else if (current) {

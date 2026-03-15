@@ -59,7 +59,7 @@ function generateSlides(stats) {
     });
 
     // ===== SLIDE 2: Top Messagers =====
-    const top10 = stats.ranking.slice(0, 10);
+    const top10 = stats.ranking;
     const maxCount = top10[0]?.[1].count || 1;
     const rankingHTML = top10.map(([name, data], i) => {
         const posClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : 'normal';
@@ -365,7 +365,7 @@ function generateSlides(stats) {
     // ===== SLIDE 10: Message Length Ranking =====
     const avgLenRanking = [...stats.ranking]
         .sort((a, b) => b[1].avgLen - a[1].avgLen)
-        .slice(0, 8);
+        .slice(0, stats.ranking.length);
     const maxAvgLen = avgLenRanking[0]?.[1].avgLen || 1;
     const lenRankHTML = avgLenRanking.map(([name, data], i) => {
         const barWidth = ((data.avgLen / maxAvgLen) * 100).toFixed(1);
@@ -460,7 +460,7 @@ function generateSlides(stats) {
     // ===== SLIDE 12: Emoji per person =====
     if (stats.emojis.perPerson.length > 0) {
         const maxEmojiCount = stats.emojis.perPerson[0][1] || 1;
-        const emojiRankHTML = stats.emojis.perPerson.slice(0, 8).map(([name, count], i) => {
+        const emojiRankHTML = stats.emojis.perPerson.map(([name, count], i) => {
             const msgCount = stats.perPerson[name]?.count || 1;
             const ratio = (count / msgCount).toFixed(2);
             const barWidth = ((count / maxEmojiCount) * 100).toFixed(1);
