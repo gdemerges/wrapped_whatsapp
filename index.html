@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Wrapped</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+</head>
+<body>
+    <!-- Upload Screen -->
+    <div id="upload-screen" class="screen active">
+        <div class="upload-container">
+            <div class="logo-wrapper">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                        <path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.494A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.387 0-4.592-.838-6.316-2.234l-.44-.37-3.528 1.18 1.18-3.522-.372-.443A9.957 9.957 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+                    </svg>
+                </div>
+                <h1 class="logo-title">WhatsApp<br><span>Wrapped</span></h1>
+            </div>
+            <p class="upload-subtitle">Decouvre les stats cachees de tes conversations</p>
+
+            <div class="how-to">
+                <h3>Comment exporter ta conversation ?</h3>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <p>Ouvre la conversation WhatsApp</p>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <p>Appuie sur le nom du groupe/contact en haut</p>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <p>Descends et appuie sur <strong>"Exporter la discussion"</strong></p>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <p>Choisis <strong>"Sans medias"</strong> puis envoie-toi le fichier</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="drop-zone" id="drop-zone">
+                <div class="drop-icon">+</div>
+                <p>Glisse ton fichier .txt ici</p>
+                <p class="drop-or">ou</p>
+                <label class="file-btn">
+                    Choisir un fichier
+                    <input type="file" id="file-input" accept=".txt,.zip" hidden>
+                </label>
+            </div>
+            <p class="privacy-note">Tes donnees restent sur ton appareil. Rien n'est envoye a un serveur.</p>
+        </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="screen">
+        <div class="loading-container">
+            <div class="loading-spinner"></div>
+            <p class="loading-text">Analyse en cours...</p>
+            <p class="loading-sub" id="loading-status">Lecture du fichier</p>
+        </div>
+    </div>
+
+    <!-- Wrapped Slides -->
+    <div id="wrapped-screen" class="screen">
+        <div class="slides-container" id="slides-container">
+            <!-- Slides are injected by JS -->
+        </div>
+        <div class="nav-dots" id="nav-dots"></div>
+        <button class="nav-arrow nav-prev" id="nav-prev">&larr;</button>
+        <button class="nav-arrow nav-next" id="nav-next">&rarr;</button>
+        <div class="swipe-hint" id="swipe-hint">Swipe ou utilise les fleches &rarr;</div>
+    </div>
+
+    <script src="js/parser.js"></script>
+    <script src="js/stats.js"></script>
+    <script src="js/slides.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
