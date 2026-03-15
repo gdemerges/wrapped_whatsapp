@@ -461,6 +461,40 @@ html, body {
     flex-shrink: 0;
 }
 
+/* Filter bar */
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    justify-content: center;
+    margin: 0.75rem 0 1rem;
+}
+
+.filter-btn {
+    padding: 0.35rem 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 50px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.filter-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+}
+
+.filter-btn.active {
+    background: var(--accent-purple);
+    border-color: var(--accent-purple);
+    color: #fff;
+}
+
 /* Chart container */
 .chart-wrapper {
     position: relative;

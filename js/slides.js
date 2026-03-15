@@ -190,6 +190,94 @@ function generateSlides(stats) {
         },
     });
 
+    // ===== SLIDE 4b: Evolution per person =====
+    const allAuthors = stats.ranking.map(r => r[0]);
+    const filterBtns = ['Tous', ...allAuthors].map((name, i) => {
+        const active = i === 0 ? ' active' : '';
+        return `<button class="filter-btn${active}" data-filter="${i === 0 ? '__all__' : name}">${name}</button>`;
+    }).join('');
+
+    slides.push({
+        gradient: g(),
+        html: `
+            <div class="slide-inner">
+                <span class="slide-tag">Evolution</span>
+                <h2 class="slide-title">Qui parle quand ?</h2>
+                <div class="filter-bar" id="evolution-filters">${filterBtns}</div>
+                <div class="chart-wrapper">
+                    <canvas id="chart-evolution" height="300"></canvas>
+                </div>
+            </div>
+        `,
+        chart: (_, slide) => {
+            const canvas = slide.querySelector('#chart-evolution');
+            const months = Object.keys(stats.monthly).sort();
+            const monthLabels = months.map(m => {
+                const [y, mo] = m.split('-');
+                const d = new Date(y, parseInt(mo) - 1);
+                return d.toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
+            });
+
+            function makeDatasets(filter) {
+                const authors = filter === '__all__' ? allAuthors : [filter];
+                return authors.map((author, i) => {
+                    const idx = allAuthors.indexOf(author);
+                    const data = months.map(m => stats.monthlyPerPerson[author]?.[m] || 0);
+                    const color = CHART_COLORS[idx % CHART_COLORS.length];
+                    return {
+                        label: author,
+                        data,
+                        borderColor: color,
+                        backgroundColor: color + '33',
+                        borderWidth: filter === '__all__' ? 2 : 3,
+                        pointRadius: filter === '__all__' ? 2 : 4,
+                        pointHoverRadius: 6,
+                        tension: 0.3,
+                        fill: filter !== '__all__',
+                    };
+                });
+            }
+
+            let chart = new Chart(canvas.getContext('2d'), {
+                type: 'line',
+                data: { labels: monthLabels, datasets: makeDatasets('__all__') },
+                options: {
+                    responsive: true,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: { color: 'rgba(255,255,255,0.8)', padding: 8, font: { size: 9 }, boxWidth: 10 },
+                        },
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 9 } },
+                            grid: { display: false },
+                        },
+                        y: {
+                            ticks: { color: 'rgba(255,255,255,0.5)' },
+                            grid: { color: 'rgba(255,255,255,0.06)' },
+                            beginAtZero: true,
+                        },
+                    },
+                },
+            });
+
+            slide.querySelector('#evolution-filters').addEventListener('click', (e) => {
+                const btn = e.target.closest('.filter-btn');
+                if (!btn) return;
+                slide.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const filter = btn.dataset.filter;
+                chart.data.datasets = makeDatasets(filter);
+                chart.options.plugins.legend.display = filter === '__all__';
+                chart.update();
+            });
+        },
+    });
+
     // ===== SLIDE 5: Heatmap =====
     const maxHeat = Math.max(...stats.heatmap.flat());
     const heatCells = [];

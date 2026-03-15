@@ -118,6 +118,14 @@ const StatsEngine = {
             stats.monthly[key] = (stats.monthly[key] || 0) + 1;
         }
 
+        // Monthly per person (for evolution chart)
+        stats.monthlyPerPerson = {};
+        for (const m of messages) {
+            const key = `${m.datetime.getFullYear()}-${String(m.datetime.getMonth() + 1).padStart(2, '0')}`;
+            if (!stats.monthlyPerPerson[m.author]) stats.monthlyPerPerson[m.author] = {};
+            stats.monthlyPerPerson[m.author][key] = (stats.monthlyPerPerson[m.author][key] || 0) + 1;
+        }
+
         // Top words
         stats.topWords = this.computeTopWords(textMessages.map(m => m.message));
 
