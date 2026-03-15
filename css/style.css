@@ -899,3 +899,12 @@ html, body {
     font-size: 0.9rem;
     color: var(--text-secondary);
 }
+
+.year-btn-all {
+    border-style: dashed;
+    margin-top: 0.25rem;
+}
+
+.year-btn-all .year-value {
+    font-size: 1.1rem;
+}

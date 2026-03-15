@@ -95,10 +95,11 @@
                 selectedYear = years[0];
             }
 
-            // Re-parse with year filter
-            const messages = WhatsAppParser.parse(text, { year: selectedYear });
+            // Re-parse with year filter (null = all years)
+            const messages = WhatsAppParser.parse(text, selectedYear ? { year: selectedYear } : {});
 
-            loadingStatus.textContent = `${messages.length} messages en ${selectedYear} ! Calcul des stats...`;
+            const yearLabel = selectedYear ? `en ${selectedYear}` : 'au total';
+            loadingStatus.textContent = `${messages.length} messages ${yearLabel} ! Calcul des stats...`;
             await new Promise(r => setTimeout(r, 200));
 
             const stats = StatsEngine.compute(messages);
@@ -136,6 +137,10 @@
                                 <span class="year-count">${yearCounts[y].toLocaleString('fr-FR')} messages</span>
                             </button>
                         `).join('')}
+                        <button class="year-btn year-btn-all" data-year="all">
+                            <span class="year-value">Toutes les annees</span>
+                            <span class="year-count">${Object.values(yearCounts).reduce((a, b) => a + b, 0).toLocaleString('fr-FR')} messages</span>
+                        </button>
                     </div>
                 </div>
             `;
@@ -145,9 +150,9 @@
 
             overlay.querySelectorAll('.year-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
-                    const year = parseInt(btn.dataset.year);
+                    const raw = btn.dataset.year;
                     overlay.remove();
-                    resolve(year);
+                    resolve(raw === 'all' ? null : parseInt(raw));
                 });
             });
         });
