@@ -17,6 +17,7 @@
     let totalSlides = 0;
     let slideElements = [];
     let chartInitialized = {};
+    let currentStats = null;
 
     // ========== Screen management ==========
     function showScreen(screen) {
@@ -103,6 +104,7 @@
             await new Promise(r => setTimeout(r, 200));
 
             const stats = StatsEngine.compute(messages);
+            currentStats = stats;
 
             loadingStatus.textContent = 'Generation du Wrapped...';
             await new Promise(r => setTimeout(r, 200));
@@ -187,8 +189,27 @@
         const resetBtn = document.createElement('button');
         resetBtn.className = 'reset-btn';
         resetBtn.textContent = 'Nouvelle analyse';
-        resetBtn.addEventListener('click', () => location.reload());
+        resetBtn.addEventListener('click', () => {
+            // Clear hash when resetting
+            history.replaceState(null, '', window.location.pathname);
+            location.reload();
+        });
         wrappedScreen.appendChild(resetBtn);
+
+        // Inject share button next to "Analyser" button in last slide
+        const lastSlide = slideElements[slideElements.length - 1];
+        const analyserBtn = lastSlide.querySelector('.file-btn');
+        if (analyserBtn) {
+            const shareBtn = document.createElement('button');
+            shareBtn.className = 'file-btn';
+            shareBtn.style.cssText = 'margin-top:1rem; margin-right:0.75rem; background:var(--accent-purple);';
+            shareBtn.textContent = 'Partager';
+            shareBtn.addEventListener('click', () => {
+                if (!currentStats) return;
+                copyToClipboard(buildShareURL(currentStats, null));
+            });
+            analyserBtn.parentNode.insertBefore(shareBtn, analyserBtn);
+        }
 
         // Initialize chart for first slide if any
         initChartForSlide(0);
@@ -472,4 +493,100 @@
 
         summaryContent.innerHTML = html;
     }
+
+    // ========== Sharing ==========
+    function serializeStats(stats) {
+        // Clone and strip heavy/unnecessary fields
+        const s = JSON.parse(JSON.stringify(stats));
+        // Convert dates to ISO strings
+        s.startDate = stats.startDate.toISOString();
+        s.endDate = stats.endDate.toISOString();
+        if (s.firstMessage) {
+            s.firstMessage.datetime = stats.firstMessage.datetime.toISOString();
+        }
+        if (s.longestMessage && s.longestMessage.datetime) {
+            s.longestMessage.datetime = stats.longestMessage.datetime.toISOString();
+        }
+        // Remove daily data (heavy + already used for streak/mostActiveDay)
+        delete s.daily;
+        return s;
+    }
+
+    function deserializeStats(s) {
+        s.startDate = new Date(s.startDate);
+        s.endDate = new Date(s.endDate);
+        if (s.firstMessage && s.firstMessage.datetime) {
+            s.firstMessage.datetime = new Date(s.firstMessage.datetime);
+        }
+        if (s.longestMessage && s.longestMessage.datetime) {
+            s.longestMessage.datetime = new Date(s.longestMessage.datetime);
+        }
+        return s;
+    }
+
+    function buildShareURL(stats, slideIndex) {
+        const payload = { s: serializeStats(stats) };
+        if (slideIndex != null) payload.i = slideIndex;
+        const json = JSON.stringify(payload);
+        const compressed = LZString.compressToEncodedURIComponent(json);
+        return window.location.origin + window.location.pathname + '#share=' + compressed;
+    }
+
+    function showToast(message) {
+        const toast = $('#share-toast');
+        toast.textContent = message;
+        toast.classList.add('visible');
+        setTimeout(() => toast.classList.remove('visible'), 2000);
+    }
+
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            showToast('Lien copie !');
+        }).catch(() => {
+            // Fallback
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showToast('Lien copie !');
+        });
+    }
+
+    // ========== Load from shared URL ==========
+    function tryLoadFromURL() {
+        const hash = window.location.hash;
+        if (!hash.startsWith('#share=')) return false;
+
+        try {
+            const compressed = hash.slice('#share='.length);
+            const json = LZString.decompressFromEncodedURIComponent(compressed);
+            if (!json) return false;
+
+            const payload = JSON.parse(json);
+            const stats = deserializeStats(payload.s);
+            currentStats = stats;
+
+            const slides = generateSlides(stats);
+            renderSlides(slides);
+            buildSummary(stats);
+            showScreen(wrappedScreen);
+
+            // Jump to specific slide if specified
+            if (payload.i != null && payload.i > 0) {
+                setTimeout(() => goToSlide(payload.i), 100);
+            }
+
+            return true;
+        } catch (e) {
+            console.error('Failed to load shared data:', e);
+            return false;
+        }
+    }
+
+    // Try loading shared data on startup
+    tryLoadFromURL();
 })();

@@ -1080,6 +1080,49 @@ html, body {
     }
 }
 
+/* Share button (last slide) */
+.share-btn-final {
+    display: inline-block;
+    padding: 0.7rem 2rem;
+    margin-top: 1.5rem;
+    background: var(--accent-purple);
+    color: #fff;
+    font-weight: 700;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-family: inherit;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.share-btn-final:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+}
+
+.share-toast {
+    position: fixed;
+    top: 4rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: var(--accent-green);
+    color: #000;
+    padding: 0.6rem 1.5rem;
+    border-radius: 50px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    z-index: 300;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s, transform 0.3s;
+}
+
+.share-toast.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
 /* Year picker overlay */
 .year-picker-overlay {
     position: fixed;
