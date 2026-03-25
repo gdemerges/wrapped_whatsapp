@@ -20,6 +20,11 @@ const WhatsAppParser = {
         /^(\d{2}\/\d{2}\/\d{4}) (\d{2}:\d{2}:\d{2}) - ([^:]+): (.+)$/,
     ],
 
+    // Authors that are bots/system and should always be excluded
+    SYSTEM_AUTHORS: [
+        'Meta AI',
+    ],
+
     SYSTEM_KEYWORDS: [
         'a créé le groupe', 'vous a ajouté', 'a ajouté', 'a changé l\'icône',
         'Les messages et les appels', 'a quitté', 'a été retiré', 'est passé',
@@ -28,6 +33,8 @@ const WhatsAppParser = {
         'changed this group', 'left', 'removed', 'joined using',
         'a modifié le sujet', 'a rejoint en utilisant', 'security code changed',
         'Le code de sécurité', 'a changé le sujet',
+        'a remplacé le nom du groupe', 'Seuls les messages partagés avec @Meta AI',
+        'Les messages sont générés par l\'IA',
     ],
 
     MEDIA_PATTERNS: [
@@ -141,7 +148,8 @@ const WhatsAppParser = {
 
         // Mark system & media messages
         for (const r of validRecords) {
-            r.isSystem = this.SYSTEM_KEYWORDS.some(k => r.message.includes(k));
+            r.isSystem = this.SYSTEM_KEYWORDS.some(k => r.message.includes(k)) ||
+                         this.SYSTEM_AUTHORS.some(a => r.author === a);
             r.isMedia = this.MEDIA_PATTERNS.some(k => r.message.includes(k));
             r.isEdited = r.message.includes('<Ce message a été modifié>') ||
                          r.message.includes('<This message was edited>');
