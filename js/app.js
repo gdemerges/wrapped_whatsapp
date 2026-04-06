@@ -397,7 +397,7 @@
                             const emojiCount = stats.emojis.perPerson.find(e => e[0] === name)?.[1] || 0;
                             return `<tr>
                                 <td>${i + 1}</td>
-                                <td>${name}</td>
+                                <td>${escapeHtml(name)}</td>
                                 <td>${fmt(data.count)}</td>
                                 <td>${data.percent}%</td>
                                 <td>${data.avgLen}</td>
@@ -469,15 +469,15 @@
         // --- Section: Fun facts ---
         const facts = [];
         if (stats.longestMessage?.msgLen > 0) {
-            facts.push(`Le plus long message : ${fmt(stats.longestMessage.msgLen)} caracteres par ${stats.longestMessage.author}`);
+            facts.push(`Le plus long message : ${fmt(stats.longestMessage.msgLen)} caracteres par ${escapeHtml(stats.longestMessage.author)}`);
         }
-        if (stats.nightOwl) facts.push(`Couche-tard : ${stats.nightOwl[0]} (${stats.nightOwl[1]} msgs entre 0h-5h)`);
-        if (stats.earlyBird) facts.push(`Leve-tot : ${stats.earlyBird[0]} (${stats.earlyBird[1]} msgs entre 5h-8h)`);
+        if (stats.nightOwl) facts.push(`Couche-tard : ${escapeHtml(stats.nightOwl[0])} (${stats.nightOwl[1]} msgs entre 0h-5h)`);
+        if (stats.earlyBird) facts.push(`Leve-tot : ${escapeHtml(stats.earlyBird[0])} (${stats.earlyBird[1]} msgs entre 5h-8h)`);
         if (stats.responseStats?.fastest) {
-            facts.push(`Plus reactif : ${stats.responseStats.fastest[0]} (${fmtTime(stats.responseStats.fastest[1])} en moyenne)`);
+            facts.push(`Plus reactif : ${escapeHtml(stats.responseStats.fastest[0])} (${fmtTime(stats.responseStats.fastest[1])} en moyenne)`);
         }
         if (stats.responseStats?.slowest) {
-            facts.push(`Plus lent a repondre : ${stats.responseStats.slowest[0]} (${fmtTime(stats.responseStats.slowest[1])} en moyenne)`);
+            facts.push(`Plus lent a repondre : ${escapeHtml(stats.responseStats.slowest[0])} (${fmtTime(stats.responseStats.slowest[1])} en moyenne)`);
         }
 
         if (facts.length > 0) {

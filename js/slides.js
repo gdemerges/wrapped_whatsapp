@@ -70,7 +70,7 @@ function generateSlides(stats) {
                 <div class="ranking-pos ${posClass}">${i + 1}</div>
                 <div class="ranking-bar-wrapper">
                     <div class="ranking-bar-label">
-                        <span class="name">${name}</span>
+                        <span class="name">${escapeHtml(name)}</span>
                         <span class="value">${StatsEngine.fmt(data.count)} (${data.percent}%)</span>
                     </div>
                     <div class="ranking-bar">
@@ -383,7 +383,7 @@ function generateSlides(stats) {
         const size = 0.75 + (1 - i / 25) * 0.8;
         const color = CHART_COLORS[i % CHART_COLORS.length];
         const opacity = 0.15 + (1 - i / 25) * 0.2;
-        return `<span class="word-tag" style="font-size:${size}rem;background:${color}${Math.round(opacity * 255).toString(16).padStart(2, '0')};color:${color};">${word} <small style="opacity:0.6;">${count}</small></span>`;
+        return `<span class="word-tag" style="font-size:${size}rem;background:${color}${Math.round(opacity * 255).toString(16).padStart(2, '0')};color:${color};">${escapeHtml(word)} <small style="opacity:0.6;">${count}</small></span>`;
     }).join('');
 
     slides.push({
@@ -399,7 +399,7 @@ function generateSlides(stats) {
 
     // ===== SLIDE 8: Emojis =====
     const emojiItems = stats.emojis.top.slice(0, 12).map(([emoji, count]) =>
-        `<div class="emoji-item"><span class="emoji">${emoji}</span><span class="emoji-count">${StatsEngine.fmt(count)}</span></div>`
+        `<div class="emoji-item"><span class="emoji">${escapeHtml(emoji)}</span><span class="emoji-count">${StatsEngine.fmt(count)}</span></div>`
     ).join('');
 
     slides.push({
@@ -464,7 +464,7 @@ function generateSlides(stats) {
                 <div class="ranking-pos ${posClass}">${i + 1}</div>
                 <div class="ranking-bar-wrapper">
                     <div class="ranking-bar-label">
-                        <span class="name">${name}</span>
+                        <span class="name">${escapeHtml(name)}</span>
                         <span class="value">${data.avgLen} car.</span>
                     </div>
                     <div class="ranking-bar">
@@ -505,28 +505,28 @@ function generateSlides(stats) {
     if (stats.longestMessage && stats.longestMessage.msgLen > 0) {
         funFacts.push({
             icon: '📝',
-            text: `Le plus long message (<strong>${StatsEngine.fmt(stats.longestMessage.msgLen)} caracteres</strong>) a ete envoye par <strong>${stats.longestMessage.author}</strong>`,
+            text: `Le plus long message (<strong>${StatsEngine.fmt(stats.longestMessage.msgLen)} caracteres</strong>) a ete envoye par <strong>${escapeHtml(stats.longestMessage.author)}</strong>`,
         });
     }
 
     if (stats.nightOwl) {
         funFacts.push({
             icon: '🦉',
-            text: `Le couche-tard du groupe : <strong>${stats.nightOwl[0]}</strong> avec ${stats.nightOwl[1]} messages envoyes entre 0h et 5h`,
+            text: `Le couche-tard du groupe : <strong>${escapeHtml(stats.nightOwl[0])}</strong> avec ${stats.nightOwl[1]} messages envoyes entre 0h et 5h`,
         });
     }
 
     if (stats.earlyBird) {
         funFacts.push({
             icon: '🐦',
-            text: `Le leve-tot du groupe : <strong>${stats.earlyBird[0]}</strong> avec ${stats.earlyBird[1]} messages envoyes entre 5h et 8h`,
+            text: `Le leve-tot du groupe : <strong>${escapeHtml(stats.earlyBird[0])}</strong> avec ${stats.earlyBird[1]} messages envoyes entre 5h et 8h`,
         });
     }
 
     if (stats.responseStats && stats.responseStats.fastest) {
         funFacts.push({
             icon: '⚡',
-            text: `Le plus reactif : <strong>${stats.responseStats.fastest[0]}</strong> avec un temps de reponse moyen de <strong>${StatsEngine.fmtTime(stats.responseStats.fastest[1])}</strong>`,
+            text: `Le plus reactif : <strong>${escapeHtml(stats.responseStats.fastest[0])}</strong> avec un temps de reponse moyen de <strong>${StatsEngine.fmtTime(stats.responseStats.fastest[1])}</strong>`,
         });
     }
 
@@ -559,7 +559,7 @@ function generateSlides(stats) {
                     <div class="ranking-pos ${posClass}">${i + 1}</div>
                     <div class="ranking-bar-wrapper">
                         <div class="ranking-bar-label">
-                            <span class="name">${name}</span>
+                            <span class="name">${escapeHtml(name)}</span>
                             <span class="value">${StatsEngine.fmt(count)} (${ratio}/msg)</span>
                         </div>
                         <div class="ranking-bar">
@@ -617,7 +617,7 @@ function generateSlides(stats) {
                     </div>
                 </div>
                 <p class="slide-subtitle" style="margin-top:1.5rem;">
-                    ${stats.ranking[0] ? `<strong>${stats.ranking[0][0]}</strong> domine avec ${stats.ranking[0][1].percent}% des messages` : ''}
+                    ${stats.ranking[0] ? `<strong>${escapeHtml(stats.ranking[0][0])}</strong> domine avec ${stats.ranking[0][1].percent}% des messages` : ''}
                 </p>
                 <button class="file-btn" onclick="location.reload()" style="margin-top:1rem;">Analyser une autre conversation</button>
             </div>
