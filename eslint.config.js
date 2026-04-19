@@ -1,0 +1,36 @@
+export default [
+    {
+        languageOptions: {
+            ecmaVersion: 'latest',
+            sourceType: 'module',
+            globals: {
+                window: 'readonly',
+                document: 'readonly',
+                navigator: 'readonly',
+                self: 'readonly',
+                localStorage: 'readonly',
+                history: 'readonly',
+                location: 'readonly',
+                requestAnimationFrame: 'readonly',
+                setTimeout: 'readonly',
+                clearTimeout: 'readonly',
+                alert: 'readonly',
+                console: 'readonly',
+                URL: 'readonly',
+                Worker: 'readonly',
+                Chart: 'readonly',
+                JSZip: 'readonly',
+                LZString: 'readonly',
+                process: 'readonly',
+            },
+        },
+        rules: {
+            'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+            'no-undef': 'error',
+            'no-var': 'error',
+            'prefer-const': 'warn',
+            'no-console': 'off',
+        },
+        ignores: ['node_modules/**', 'dist/**'],
+    },
+];

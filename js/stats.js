@@ -1,322 +1,452 @@
 /**
- * Statistics computation from parsed WhatsApp messages
+ * Statistics computation from parsed WhatsApp messages.
+ * Single-pass where possible.
  */
 
-function escapeHtml(str) {
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
+import { DAYS_FR, localDayKey, localMonthKey } from './utils.js';
+import { stopwordsFor, detectLanguage } from './lang/stopwords.js';
+import { computeSentiment } from './lang/sentiment.js';
 
-const StatsEngine = {
+const EMOJI_RE = /\p{Extended_Pictographic}\uFE0F?(?:\u200D\p{Extended_Pictographic}\uFE0F?)*/gu;
+const WORD_RE = /[a-zàâäéèêëïîôùûüÿçœæ']+/gi;
+const URL_RE = /https?:\/\/\S+/g;
+const HTML_STRIP_RE = /<[^>]+>/g;
+const GHOST_THRESHOLD_MIN = 60 * 24; // 24h = ghosted
 
-    STOP_WORDS: new Set([
-        'je', 'tu', 'il', 'elle', 'nous', 'vous', 'ils', 'elles', 'on',
-        'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'et', 'en',
-        'au', 'aux', 'ce', 'se', 'sa', 'son', 'ses', 'mon', 'ma', 'mes',
-        'ton', 'ta', 'tes', 'que', 'qui', 'quoi', 'dont', 'ou', 'mais',
-        'si', 'ne', 'pas', 'plus', 'par', 'pour', 'dans', 'sur', 'avec',
-        'tout', 'tous', 'toute', 'toutes', 'bien', 'aussi', 'comme',
-        'quand', 'alors', 'donc', 'car', 'encore', 'trop', 'fait',
-        'avoir', 'etre', 'faire', 'dire', 'aller', 'voir', 'venir',
-        'est', 'sont', 'suis', 'avons', 'avez', 'ont', 'ai', 'as',
-        'era', 'ete', 'cette', 'ces', 'ici', 'moi', 'toi', 'lui',
-        'elle', 'leur', 'leurs', 'notre', 'votre', 'meme', 'autre',
-        'autres', 'peu', 'rien', 'tres', 'peut', 'faut', 'chez',
-        'sans', 'sous', 'vers', 'apres', 'avant', 'entre', 'contre',
-        'image', 'absente', 'gif', 'retire', 'sticker', 'omis',
-        'message', 'modifie', 'nan', 'https', 'http', 'www',
-        'oui', 'non', 'bon', 'bah', 'ben', 'ouais', 'haha',
-        'the', 'and', 'for', 'that', 'this', 'with', 'you', 'was',
-        'are', 'not', 'but', 'have', 'has', 'had', 'from', 'they',
-        'medias',
-    ]),
+export function compute(messages) {
+    if (!messages || messages.length === 0) {
+        throw new Error('Aucun message à analyser');
+    }
 
-    DAYS_FR: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'],
+    // Ensure chronological order
+    messages = [...messages].sort((a, b) => a.datetime - b.datetime);
 
-    /**
-     * Compute all statistics from messages
-     */
-    compute(messages) {
-        const stats = {};
+    const stats = initAccumulators();
 
-        // Basic info
-        const dates = messages.map(m => m.datetime);
-        stats.startDate = new Date(Math.min(...dates));
-        stats.endDate = new Date(Math.max(...dates));
-        stats.totalDays = Math.ceil((stats.endDate - stats.startDate) / (1000 * 60 * 60 * 24)) + 1;
-        stats.totalMessages = messages.length;
-        stats.avgPerDay = (stats.totalMessages / stats.totalDays).toFixed(1);
-        stats.totalChars = messages.reduce((s, m) => s + m.msgLen, 0);
-        stats.totalMedia = messages.filter(m => m.isMedia).length;
-        stats.totalEdited = messages.filter(m => m.isEdited).length;
-        stats.totalLinks = messages.filter(m => /https?:\/\//.test(m.message)).length;
+    // Language detection on a sample before the loop
+    const sample = messages.slice(0, 500).map(m => m.message).join(' ');
+    stats.lang = detectLanguage(sample);
+    const stopwords = stopwordsFor(stats.lang);
 
-        const textMessages = messages.filter(m => !m.isMedia);
-        stats.avgMsgLen = textMessages.length > 0
-            ? Math.round(textMessages.reduce((s, m) => s + m.msgLen, 0) / textMessages.length)
-            : 0;
+    let prev = null;
+    let prevDayKey = null;
+    let longestMsg = null;
 
-        // Participants
-        const authors = [...new Set(messages.map(m => m.author))];
-        stats.participants = authors.length;
+    for (const m of messages) {
+        const author = m.author;
+        const person = stats.perPerson[author] ||= newPerson();
 
-        // Per person stats
-        stats.perPerson = {};
-        for (const author of authors) {
-            const msgs = messages.filter(m => m.author === author);
-            const texts = msgs.filter(m => !m.isMedia);
-            stats.perPerson[author] = {
-                count: msgs.length,
-                percent: ((msgs.length / stats.totalMessages) * 100).toFixed(1),
-                media: msgs.filter(m => m.isMedia).length,
-                edited: msgs.filter(m => m.isEdited).length,
-                avgLen: texts.length > 0 ? Math.round(texts.reduce((s, m) => s + m.msgLen, 0) / texts.length) : 0,
-                totalChars: msgs.reduce((s, m) => s + m.msgLen, 0),
-                links: msgs.filter(m => /https?:\/\//.test(m.message)).length,
-            };
-        }
+        // --- Counts & lengths ---
+        stats.totalMessages++;
+        stats.totalChars += m.msgLen;
+        person.count++;
+        person.totalChars += m.msgLen;
 
-        // Sort by message count
-        stats.ranking = Object.entries(stats.perPerson)
-            .sort((a, b) => b[1].count - a[1].count);
+        if (m.isMedia) {
+            stats.totalMedia++;
+            person.media++;
+            bucketMediaType(stats.mediaTypes, m.message);
+        } else {
+            stats.textCount++;
+            stats.textChars += m.msgLen;
+            person.textCount++;
+            person.textChars += m.msgLen;
 
-        // Hourly distribution
-        stats.hourly = new Array(24).fill(0);
-        for (const m of messages) {
-            stats.hourly[m.datetime.getHours()]++;
-        }
-        stats.peakHour = stats.hourly.indexOf(Math.max(...stats.hourly));
+            if (!longestMsg || m.msgLen > longestMsg.msgLen) longestMsg = m;
 
-        // Day of week distribution
-        stats.weekday = new Array(7).fill(0);
-        for (const m of messages) {
-            // JS: 0=Sunday, we want 0=Monday
-            const day = (m.datetime.getDay() + 6) % 7;
-            stats.weekday[day]++;
-        }
-        stats.peakDay = this.DAYS_FR[stats.weekday.indexOf(Math.max(...stats.weekday))];
-
-        // Heatmap: day x hour
-        stats.heatmap = Array.from({ length: 7 }, () => new Array(24).fill(0));
-        for (const m of messages) {
-            const day = (m.datetime.getDay() + 6) % 7;
-            const hour = m.datetime.getHours();
-            stats.heatmap[day][hour]++;
-        }
-
-        // Daily message counts
-        stats.daily = {};
-        for (const m of messages) {
-            const key = m.datetime.toISOString().split('T')[0];
-            stats.daily[key] = (stats.daily[key] || 0) + 1;
-        }
-
-        // Most active day
-        const dailyEntries = Object.entries(stats.daily);
-        dailyEntries.sort((a, b) => b[1] - a[1]);
-        stats.mostActiveDay = dailyEntries[0] || ['N/A', 0];
-
-        // Monthly counts
-        stats.monthly = {};
-        for (const m of messages) {
-            const key = `${m.datetime.getFullYear()}-${String(m.datetime.getMonth() + 1).padStart(2, '0')}`;
-            stats.monthly[key] = (stats.monthly[key] || 0) + 1;
-        }
-
-        // Monthly per person (for evolution chart)
-        stats.monthlyPerPerson = {};
-        for (const m of messages) {
-            const key = `${m.datetime.getFullYear()}-${String(m.datetime.getMonth() + 1).padStart(2, '0')}`;
-            if (!stats.monthlyPerPerson[m.author]) stats.monthlyPerPerson[m.author] = {};
-            stats.monthlyPerPerson[m.author][key] = (stats.monthlyPerPerson[m.author][key] || 0) + 1;
-        }
-
-        // Top words
-        stats.topWords = this.computeTopWords(textMessages.map(m => m.message));
-
-        // Top words per person (top 5 authors)
-        stats.topWordsPerPerson = {};
-        const topAuthors = stats.ranking.slice(0, 5).map(r => r[0]);
-        for (const author of topAuthors) {
-            const msgs = textMessages.filter(m => m.author === author).map(m => m.message);
-            stats.topWordsPerPerson[author] = this.computeTopWords(msgs, 10);
-        }
-
-        // Emojis
-        stats.emojis = this.computeEmojis(messages);
-
-        // Media types
-        stats.mediaTypes = this.computeMediaTypes(messages);
-
-        // Response times (for 1-on-1 or group)
-        stats.responseStats = this.computeResponseTimes(messages);
-
-        // Longest message
-        const longestMsg = textMessages.reduce((max, m) => m.msgLen > max.msgLen ? m : max, textMessages[0] || { msgLen: 0 });
-        stats.longestMessage = longestMsg;
-
-        // Streaks
-        stats.streak = this.computeStreak(stats.daily);
-
-        // First message
-        stats.firstMessage = messages[0];
-
-        // Night owl & early bird
-        const nightMessages = messages.filter(m => {
-            const h = m.datetime.getHours();
-            return h >= 0 && h < 5;
-        });
-        const nightOwlCounts = {};
-        for (const m of nightMessages) {
-            nightOwlCounts[m.author] = (nightOwlCounts[m.author] || 0) + 1;
-        }
-        const nightOwlEntries = Object.entries(nightOwlCounts).sort((a, b) => b[1] - a[1]);
-        stats.nightOwl = nightOwlEntries[0] || null;
-
-        const morningMessages = messages.filter(m => {
-            const h = m.datetime.getHours();
-            return h >= 5 && h < 8;
-        });
-        const earlyBirdCounts = {};
-        for (const m of morningMessages) {
-            earlyBirdCounts[m.author] = (earlyBirdCounts[m.author] || 0) + 1;
-        }
-        const earlyBirdEntries = Object.entries(earlyBirdCounts).sort((a, b) => b[1] - a[1]);
-        stats.earlyBird = earlyBirdEntries[0] || null;
-
-        return stats;
-    },
-
-    computeTopWords(textArray, limit = 30) {
-        const allText = textArray.join(' ').toLowerCase();
-        const cleaned = allText
-            .replace(/https?:\/\/\S+/g, '')
-            .replace(/<[^>]+>/g, '');
-        const words = cleaned.match(/[a-zàâäéèêëïîôùûüÿçœæ]+/gi) || [];
-        const freq = {};
-        for (const word of words) {
-            const w = word.toLowerCase();
-            if (w.length > 2 && !this.STOP_WORDS.has(w)) {
-                freq[w] = (freq[w] || 0) + 1;
+            // Word counts
+            const cleaned = m.message.toLowerCase().replace(URL_RE, '').replace(HTML_STRIP_RE, '');
+            const words = cleaned.match(WORD_RE) || [];
+            for (const w of words) {
+                if (w.length <= 2 || stopwords.has(w)) continue;
+                stats.wordFreq[w] = (stats.wordFreq[w] || 0) + 1;
+                const entry = stats.wordAuthors[w];
+                if (!entry) {
+                    stats.wordAuthors[w] = { authors: new Set([author]), count: 1 };
+                } else {
+                    entry.authors.add(author);
+                    entry.count++;
+                }
+                (person.wordFreq[w] ||= 0);
+                person.wordFreq[w]++;
             }
         }
-        return Object.entries(freq)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, limit);
-    },
 
-    computeEmojis(messages) {
-        const emojiRegex = /\p{Extended_Pictographic}/gu;
-        const freq = {};
-        let total = 0;
-        const perPerson = {};
+        if (m.isEdited) { stats.totalEdited++; person.edited++; }
 
-        for (const m of messages) {
-            const emojis = m.message.match(emojiRegex) || [];
-            for (const e of emojis) {
-                freq[e] = (freq[e] || 0) + 1;
-                total++;
-            }
-            if (!perPerson[m.author]) perPerson[m.author] = 0;
-            perPerson[m.author] += emojis.length;
+        if (URL_RE.test(m.message)) { stats.totalLinks++; person.links++; }
+        URL_RE.lastIndex = 0;
+
+        // --- Reactions ---
+        if (m.isReaction) {
+            stats.reactions.total++;
+            stats.reactions.perAuthor[author] = (stats.reactions.perAuthor[author] || 0) + 1;
+            const e = m.reactionEmoji;
+            if (e) stats.reactions.perEmoji[e] = (stats.reactions.perEmoji[e] || 0) + 1;
         }
 
-        const top = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 15);
-        const perPersonSorted = Object.entries(perPerson).sort((a, b) => b[1] - a[1]);
+        // --- Emojis ---
+        const emojis = m.message.match(EMOJI_RE) || [];
+        for (const e of emojis) {
+            stats.emojiFreq[e] = (stats.emojiFreq[e] || 0) + 1;
+            stats.totalEmojis++;
+            person.emojis++;
+        }
 
-        return { total, unique: Object.keys(freq).length, top, perPerson: perPersonSorted };
-    },
+        // --- Time buckets ---
+        const dt = m.datetime;
+        const hour = dt.getHours();
+        const day = (dt.getDay() + 6) % 7; // 0=Monday
+        stats.hourly[hour]++;
+        stats.weekday[day]++;
+        stats.heatmap[day][hour]++;
 
-    computeMediaTypes(messages) {
-        return {
-            images: messages.filter(m => /image absente|image omitted/i.test(m.message)).length,
-            gifs: messages.filter(m => /GIF retiré|GIF omitted/i.test(m.message)).length,
-            stickers: messages.filter(m => /sticker omis|sticker omitted/i.test(m.message)).length,
-            videos: messages.filter(m => /vidéo absente|video omitted/i.test(m.message)).length,
-            audio: messages.filter(m => /audio omis|audio omitted/i.test(m.message)).length,
-            documents: messages.filter(m => /document omis|document omitted/i.test(m.message)).length,
-            links: messages.filter(m => /https?:\/\//.test(m.message)).length,
-        };
-    },
+        if (hour < 5) person.nightMsgs++;
+        else if (hour < 8) person.morningMsgs++;
 
-    computeResponseTimes(messages) {
-        if (messages.length < 2) return null;
+        const dayKey = localDayKey(dt);
+        stats.daily[dayKey] = (stats.daily[dayKey] || 0) + 1;
+        const monthKey = localMonthKey(dt);
+        stats.monthly[monthKey] = (stats.monthly[monthKey] || 0) + 1;
+        stats.monthlyPerPerson[author] ||= {};
+        stats.monthlyPerPerson[author][monthKey] = (stats.monthlyPerPerson[author][monthKey] || 0) + 1;
 
-        const times = [];
-        for (let i = 1; i < messages.length; i++) {
-            if (messages[i].author !== messages[i - 1].author) {
-                const diff = (messages[i].datetime - messages[i - 1].datetime) / 1000 / 60; // minutes
-                if (diff > 0 && diff < 1440) { // max 24h
-                    times.push({ author: messages[i].author, time: diff });
+        // --- Initiator of the day ---
+        if (dayKey !== prevDayKey) {
+            stats.initiator[author] = (stats.initiator[author] || 0) + 1;
+            prevDayKey = dayKey;
+        }
+
+        // --- Response time & ghosting ---
+        if (prev) {
+            const diffMin = (dt - prev.datetime) / 60000;
+            if (prev.author !== author && diffMin > 0) {
+                if (diffMin < 1440) {
+                    person.responseTimes.push(diffMin);
+                }
+                // Ghost breaker: ≥24h silence then different person speaks
+                if (diffMin >= GHOST_THRESHOLD_MIN) {
+                    stats.ghosts.push({
+                        silenced: prev.author,
+                        revived: author,
+                        minutes: diffMin,
+                        when: dt,
+                    });
                 }
             }
         }
+        prev = m;
 
-        // Average response time per person
-        const perPerson = {};
-        for (const t of times) {
-            if (!perPerson[t.author]) perPerson[t.author] = [];
-            perPerson[t.author].push(t.time);
+        if (!stats.firstMessage) stats.firstMessage = m;
+    }
+
+    stats.longestMessage = longestMsg || { msgLen: 0, author: '', message: '', datetime: null };
+
+    return finalize(stats, messages);
+}
+
+function initAccumulators() {
+    return {
+        totalMessages: 0,
+        totalChars: 0,
+        textCount: 0,
+        textChars: 0,
+        totalMedia: 0,
+        totalEdited: 0,
+        totalLinks: 0,
+        totalEmojis: 0,
+        perPerson: {},
+        mediaTypes: { images: 0, gifs: 0, stickers: 0, videos: 0, audio: 0, documents: 0, links: 0 },
+        hourly: new Array(24).fill(0),
+        weekday: new Array(7).fill(0),
+        heatmap: Array.from({ length: 7 }, () => new Array(24).fill(0)),
+        daily: {},
+        monthly: {},
+        monthlyPerPerson: {},
+        emojiFreq: {},
+        wordFreq: {},
+        wordAuthors: {}, // word → {authors: Set, count}
+        reactions: { total: 0, perAuthor: {}, perEmoji: {} },
+        ghosts: [],
+        initiator: {},
+        firstMessage: null,
+    };
+}
+
+function newPerson() {
+    return {
+        count: 0,
+        textCount: 0,
+        totalChars: 0,
+        textChars: 0,
+        media: 0,
+        edited: 0,
+        links: 0,
+        emojis: 0,
+        nightMsgs: 0,
+        morningMsgs: 0,
+        responseTimes: [],
+        wordFreq: {},
+    };
+}
+
+function bucketMediaType(mediaTypes, msg) {
+    if (/image absente|image omitted/i.test(msg)) mediaTypes.images++;
+    else if (/GIF retiré|GIF omitted/i.test(msg)) mediaTypes.gifs++;
+    else if (/sticker omis|sticker omitted/i.test(msg)) mediaTypes.stickers++;
+    else if (/vidéo absente|video omitted/i.test(msg)) mediaTypes.videos++;
+    else if (/audio omis|audio omitted/i.test(msg)) mediaTypes.audio++;
+    else if (/document omis|document omitted/i.test(msg)) mediaTypes.documents++;
+}
+
+function finalize(acc, messages) {
+    const dates = messages.map(m => m.datetime);
+    const startDate = new Date(Math.min(...dates));
+    const endDate = new Date(Math.max(...dates));
+    const totalDays = Math.ceil((endDate - startDate) / 86400000) + 1;
+
+    // Per-person derived metrics
+    const perPerson = {};
+    for (const [author, p] of Object.entries(acc.perPerson)) {
+        perPerson[author] = {
+            count: p.count,
+            percent: ((p.count / acc.totalMessages) * 100).toFixed(1),
+            media: p.media,
+            edited: p.edited,
+            emojis: p.emojis,
+            links: p.links,
+            totalChars: p.totalChars,
+            avgLen: p.textCount > 0 ? Math.round(p.textChars / p.textCount) : 0,
+            nightMsgs: p.nightMsgs,
+            morningMsgs: p.morningMsgs,
+            avgResponseMin: p.responseTimes.length
+                ? Math.round(p.responseTimes.reduce((s, t) => s + t, 0) / p.responseTimes.length)
+                : null,
+            _wordFreq: p.wordFreq, // kept internally, stripped before share
+        };
+    }
+
+    const ranking = Object.entries(perPerson).sort((a, b) => b[1].count - a[1].count);
+
+    // Media totals
+    acc.mediaTypes.links = acc.totalLinks;
+
+    // Top words (global)
+    const topWords = Object.entries(acc.wordFreq)
+        .sort((a, b) => b[1] - a[1]).slice(0, 30);
+
+    // Top words per top-5 person
+    const topWordsPerPerson = {};
+    for (const [author] of ranking.slice(0, 5)) {
+        const pf = perPerson[author]?._wordFreq || {};
+        topWordsPerPerson[author] = Object.entries(pf).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    }
+
+    // Unique vocabulary per person (signature lexicale)
+    const uniqueWordsPerPerson = {};
+    for (const [word, { authors, count }] of Object.entries(acc.wordAuthors)) {
+        if (count < 3) continue; // noise floor
+        if (authors.size !== 1) continue;
+        const owner = [...authors][0];
+        (uniqueWordsPerPerson[owner] ||= []).push([word, count]);
+    }
+    for (const author of Object.keys(uniqueWordsPerPerson)) {
+        uniqueWordsPerPerson[author].sort((a, b) => b[1] - a[1]);
+        uniqueWordsPerPerson[author] = uniqueWordsPerPerson[author].slice(0, 15);
+    }
+
+    // Emojis
+    const emojiEntries = Object.entries(acc.emojiFreq).sort((a, b) => b[1] - a[1]);
+    const emojisPerPerson = Object.entries(perPerson)
+        .map(([name, p]) => [name, p.emojis])
+        .sort((a, b) => b[1] - a[1]);
+
+    // Response stats
+    const responseEntries = Object.entries(perPerson)
+        .filter(([, p]) => p.avgResponseMin != null)
+        .map(([name, p]) => [name, p.avgResponseMin])
+        .sort((a, b) => a[1] - b[1]);
+
+    const responseStats = responseEntries.length
+        ? {
+            fastest: responseEntries[0],
+            slowest: responseEntries[responseEntries.length - 1],
+            all: responseEntries,
         }
+        : null;
 
-        const avgPerPerson = {};
-        for (const [author, timesArr] of Object.entries(perPerson)) {
-            const avg = timesArr.reduce((s, t) => s + t, 0) / timesArr.length;
-            avgPerPerson[author] = Math.round(avg);
-        }
+    // Most active day
+    const dailyEntries = Object.entries(acc.daily).sort((a, b) => b[1] - a[1]);
+    const mostActiveDay = dailyEntries[0] || ['N/A', 0];
 
-        const sorted = Object.entries(avgPerPerson).sort((a, b) => a[1] - b[1]);
-        return { fastest: sorted[0] || null, slowest: sorted[sorted.length - 1] || null, all: sorted };
-    },
+    // Peak hour/day
+    const peakHour = acc.hourly.indexOf(Math.max(...acc.hourly));
+    const peakDay = DAYS_FR[acc.weekday.indexOf(Math.max(...acc.weekday))];
 
-    computeStreak(daily) {
-        const dates = Object.keys(daily).sort();
-        if (dates.length === 0) return { max: 0, current: 0 };
+    // Night owl / early bird
+    const nightOwlE = Object.entries(perPerson).map(([n, p]) => [n, p.nightMsgs])
+        .filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
+    const earlyBirdE = Object.entries(perPerson).map(([n, p]) => [n, p.morningMsgs])
+        .filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
 
-        let maxStreak = 1;
-        let currentStreak = 1;
+    // Streak
+    const streak = computeStreak(acc.daily);
 
-        for (let i = 1; i < dates.length; i++) {
-            const prev = new Date(dates[i - 1]);
-            const curr = new Date(dates[i]);
-            const diffDays = Math.round((curr - prev) / (1000 * 60 * 60 * 24));
+    // Initiator ranking
+    const initiatorRanking = Object.entries(acc.initiator).sort((a, b) => b[1] - a[1]);
 
-            if (diffDays === 1) {
-                currentStreak++;
-                maxStreak = Math.max(maxStreak, currentStreak);
-            } else {
-                currentStreak = 1;
-            }
-        }
+    // Ghosting: top silences + revival rates
+    const ghostsSorted = [...acc.ghosts].sort((a, b) => b.minutes - a.minutes);
+    const ghostInitiator = {}; // who revives most often
+    const ghostSilenced = {};  // whose last message goes longest unanswered
+    for (const g of acc.ghosts) {
+        ghostInitiator[g.revived] = (ghostInitiator[g.revived] || 0) + 1;
+        ghostSilenced[g.silenced] = (ghostSilenced[g.silenced] || 0) + 1;
+    }
 
-        return { max: maxStreak };
-    },
+    // Sentiment
+    const sentiment = computeSentiment(messages);
 
-    /**
-     * Format a number with locale separators
-     */
-    fmt(n) {
-        return Number(n).toLocaleString('fr-FR');
-    },
+    // Compatibility (for 2-person conversations)
+    const compatibility = ranking.length === 2
+        ? computeCompatibility(perPerson, ranking, acc)
+        : null;
 
-    /**
-     * Format minutes into human-readable string
-     */
-    fmtTime(minutes) {
-        if (minutes < 60) return `${Math.round(minutes)} min`;
-        const h = Math.floor(minutes / 60);
-        const m = Math.round(minutes % 60);
-        return m > 0 ? `${h}h ${m}min` : `${h}h`;
-    },
+    const result = {
+        lang: acc.lang,
+        startDate,
+        endDate,
+        totalDays,
+        totalMessages: acc.totalMessages,
+        avgPerDay: (acc.totalMessages / totalDays).toFixed(1),
+        totalChars: acc.totalChars,
+        totalMedia: acc.totalMedia,
+        totalEdited: acc.totalEdited,
+        totalLinks: acc.totalLinks,
+        avgMsgLen: acc.textCount > 0 ? Math.round(acc.textChars / acc.textCount) : 0,
+        participants: Object.keys(perPerson).length,
+        perPerson,
+        ranking,
+        hourly: acc.hourly,
+        weekday: acc.weekday,
+        heatmap: acc.heatmap,
+        daily: acc.daily,
+        monthly: acc.monthly,
+        monthlyPerPerson: acc.monthlyPerPerson,
+        peakHour,
+        peakDay,
+        mostActiveDay,
+        topWords,
+        topWordsPerPerson,
+        uniqueWordsPerPerson,
+        emojis: {
+            total: acc.totalEmojis,
+            unique: Object.keys(acc.emojiFreq).length,
+            top: emojiEntries.slice(0, 15),
+            perPerson: emojisPerPerson,
+        },
+        mediaTypes: acc.mediaTypes,
+        responseStats,
+        longestMessage: acc.longestMessage,
+        streak,
+        firstMessage: acc.firstMessage,
+        nightOwl: nightOwlE[0] || null,
+        earlyBird: earlyBirdE[0] || null,
+        reactions: {
+            total: acc.reactions.total,
+            topEmojis: Object.entries(acc.reactions.perEmoji).sort((a, b) => b[1] - a[1]).slice(0, 10),
+            perAuthor: Object.entries(acc.reactions.perAuthor).sort((a, b) => b[1] - a[1]),
+        },
+        initiator: initiatorRanking,
+        ghosting: {
+            count: acc.ghosts.length,
+            longest: ghostsSorted.slice(0, 5),
+            revivers: Object.entries(ghostInitiator).sort((a, b) => b[1] - a[1]),
+            silenced: Object.entries(ghostSilenced).sort((a, b) => b[1] - a[1]),
+        },
+        sentiment,
+        compatibility,
+    };
 
-    /**
-     * Format date to FR locale string
-     */
-    fmtDate(date) {
-        return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-    },
-};
+    return stripInternal(result);
+}
+
+function stripInternal(stats) {
+    for (const p of Object.values(stats.perPerson)) delete p._wordFreq;
+    return stats;
+}
+
+function computeStreak(daily) {
+    const dates = Object.keys(daily).sort();
+    if (dates.length === 0) return { max: 0 };
+    let maxStreak = 1;
+    let cur = 1;
+    for (let i = 1; i < dates.length; i++) {
+        const prev = new Date(dates[i - 1]);
+        const curr = new Date(dates[i]);
+        const diff = Math.round((curr - prev) / 86400000);
+        if (diff === 1) { cur++; maxStreak = Math.max(maxStreak, cur); }
+        else cur = 1;
+    }
+    return { max: maxStreak };
+}
+
+/**
+ * Compatibility score for a 2-person chat.
+ * Combines hour-pattern overlap, message-length similarity, and reciprocity.
+ * Returns 0–100.
+ */
+function computeCompatibility(perPerson, ranking, acc) {
+    const [a, b] = ranking.map(r => r[0]);
+
+    // Message-length similarity (1 = identical)
+    const la = perPerson[a].avgLen || 1;
+    const lb = perPerson[b].avgLen || 1;
+    const lenSim = 1 - Math.abs(la - lb) / Math.max(la, lb);
+
+    // 3. Volume balance (1 = 50/50)
+    const ca = perPerson[a].count;
+    const cb = perPerson[b].count;
+    const balance = 1 - Math.abs(ca - cb) / (ca + cb);
+
+    // 4. Reciprocity: close response times on both sides
+    const rtA = perPerson[a].avgResponseMin ?? 60;
+    const rtB = perPerson[b].avgResponseMin ?? 60;
+    const rtMax = Math.max(rtA, rtB, 1);
+    const rtMin = Math.min(rtA, rtB, 1);
+    const rtSim = rtMin / rtMax;
+
+    // 5. Low ghost rate bonus: fewer 24h+ silences relative to days
+    const days = Object.keys(acc.daily).length || 1;
+    const ghostRate = acc.ghosts.length / days;
+    const ghostScore = Math.max(0, 1 - ghostRate * 2);
+
+    const score = (lenSim * 0.2 + balance * 0.3 + rtSim * 0.3 + ghostScore * 0.2) * 100;
+
+    return {
+        score: Math.round(score),
+        components: {
+            lengthSimilarity: Math.round(lenSim * 100),
+            volumeBalance: Math.round(balance * 100),
+            reciprocity: Math.round(rtSim * 100),
+            consistency: Math.round(ghostScore * 100),
+        },
+    };
+}
+
+/**
+ * Compare two stats objects (year N vs N-1).
+ * Returns deltas for a handful of key metrics.
+ */
+export function compareYears(current, previous) {
+    if (!current || !previous) return null;
+    const pct = (a, b) => b === 0 ? null : Math.round(((a - b) / b) * 100);
+    return {
+        messages: { current: current.totalMessages, previous: previous.totalMessages, pct: pct(current.totalMessages, previous.totalMessages) },
+        days: { current: current.totalDays, previous: previous.totalDays },
+        avgPerDay: { current: +current.avgPerDay, previous: +previous.avgPerDay, pct: pct(+current.avgPerDay, +previous.avgPerDay) },
+        emojis: { current: current.emojis.total, previous: previous.emojis.total, pct: pct(current.emojis.total, previous.emojis.total) },
+        media: { current: current.totalMedia, previous: previous.totalMedia, pct: pct(current.totalMedia, previous.totalMedia) },
+        streak: { current: current.streak.max, previous: previous.streak.max },
+    };
+}

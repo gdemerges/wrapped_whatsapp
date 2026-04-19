@@ -1,20 +1,23 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WhatsApp Wrapped</title>
+    <meta name="description" content="Analyse tes conversations WhatsApp et génère une présentation animée, 100% dans ton navigateur.">
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js" integrity="sha384-y49Zu59jZHJL/PLKgZPv3k2WI9c0Yp3pWB76V8OBVCb0QBKS8l4Ff3YslzHVX76Y" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js" integrity="sha384-0d+Gr7vM4Drod8E3hXKgciWJSWbjD/opKLLygI9ktiWbuvlDwQLzU46wJ9s5gsp7" crossorigin="anonymous"></script>
 </head>
 <body>
+    <button id="theme-toggle" class="theme-toggle" aria-label="Changer le thème" title="Changer le thème">🌙</button>
+
     <!-- Upload Screen -->
-    <div id="upload-screen" class="screen active">
+    <div id="upload-screen" class="screen active" role="region" aria-label="Écran d'import">
         <div class="upload-container">
             <div class="logo-wrapper">
-                <div class="logo-icon">
+                <div class="logo-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="currentColor" width="48" height="48">
                         <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
                         <path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.75.75 0 00.917.918l4.462-1.494A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.387 0-4.592-.838-6.316-2.234l-.44-.37-3.528 1.18 1.18-3.522-.372-.443A9.957 9.957 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
@@ -27,27 +30,15 @@
             <div class="how-to">
                 <h3>Comment exporter ta conversation ?</h3>
                 <div class="steps">
-                    <div class="step">
-                        <div class="step-number">1</div>
-                        <p>Ouvre la conversation WhatsApp</p>
-                    </div>
-                    <div class="step">
-                        <div class="step-number">2</div>
-                        <p>Appuie sur le nom du groupe/contact en haut</p>
-                    </div>
-                    <div class="step">
-                        <div class="step-number">3</div>
-                        <p>Descends et appuie sur <strong>"Exporter la discussion"</strong></p>
-                    </div>
-                    <div class="step">
-                        <div class="step-number">4</div>
-                        <p>Choisis <strong>"Sans medias"</strong> puis envoie-toi le fichier</p>
-                    </div>
+                    <div class="step"><div class="step-number" aria-hidden="true">1</div><p>Ouvre la conversation WhatsApp</p></div>
+                    <div class="step"><div class="step-number" aria-hidden="true">2</div><p>Appuie sur le nom du groupe/contact en haut</p></div>
+                    <div class="step"><div class="step-number" aria-hidden="true">3</div><p>Descends et appuie sur <strong>"Exporter la discussion"</strong></p></div>
+                    <div class="step"><div class="step-number" aria-hidden="true">4</div><p>Choisis <strong>"Sans medias"</strong> puis envoie-toi le fichier</p></div>
                 </div>
             </div>
 
-            <div class="drop-zone" id="drop-zone">
-                <div class="drop-icon">+</div>
+            <div class="drop-zone" id="drop-zone" tabindex="0" role="button" aria-label="Déposer un fichier WhatsApp exporté">
+                <div class="drop-icon" aria-hidden="true">+</div>
                 <p>Glisse ton fichier .txt ici</p>
                 <p class="drop-or">ou</p>
                 <label class="file-btn">
@@ -60,44 +51,40 @@
     </div>
 
     <!-- Loading Screen -->
-    <div id="loading-screen" class="screen">
+    <div id="loading-screen" class="screen" role="status" aria-live="polite">
         <div class="loading-container">
-            <div class="loading-spinner"></div>
+            <div class="loading-spinner" aria-hidden="true"></div>
             <p class="loading-text">Analyse en cours...</p>
             <p class="loading-sub" id="loading-status">Lecture du fichier</p>
         </div>
     </div>
 
     <!-- Wrapped Slides -->
-    <div id="wrapped-screen" class="screen">
-        <div class="slides-container" id="slides-container">
-            <!-- Slides are injected by JS -->
-        </div>
-        <div class="nav-dots" id="nav-dots"></div>
-        <button class="nav-arrow nav-prev" id="nav-prev">&larr;</button>
-        <button class="nav-arrow nav-next" id="nav-next">&rarr;</button>
-        <div class="swipe-hint" id="swipe-hint">Swipe ou utilise les fleches &rarr;</div>
-        <button class="summary-btn" id="summary-btn">Resume</button>
+    <div id="wrapped-screen" class="screen" role="region" aria-label="Résultats">
+        <div class="slides-container" id="slides-container"></div>
+        <div class="nav-dots" id="nav-dots" role="tablist" aria-label="Navigation entre les slides"></div>
+        <button class="nav-arrow nav-prev" id="nav-prev" aria-label="Slide precedente">&larr;</button>
+        <button class="nav-arrow nav-next" id="nav-next" aria-label="Slide suivante">&rarr;</button>
+        <div class="swipe-hint" id="swipe-hint" aria-hidden="true">Swipe ou utilise les fleches &rarr;</div>
+        <button class="summary-btn" id="summary-btn" aria-label="Voir le resume complet">Resume</button>
     </div>
 
     <!-- Summary overlay -->
-    <div class="summary-overlay" id="summary-overlay">
+    <div class="summary-overlay" id="summary-overlay" role="dialog" aria-label="Resume complet" aria-hidden="true">
         <div class="summary-panel">
             <div class="summary-header">
                 <h2>Resume complet</h2>
-                <button class="summary-close" id="summary-close">&times;</button>
+                <button class="summary-close" id="summary-close" aria-label="Fermer le resume">&times;</button>
             </div>
-            <div class="summary-content" id="summary-content">
-                <!-- Filled by JS -->
-            </div>
+            <div class="summary-content" id="summary-content"></div>
         </div>
     </div>
 
-    <div class="share-toast" id="share-toast">Lien copie !</div>
+    <div class="share-toast" id="share-toast" role="status">Lien copie !</div>
 
-    <script src="js/parser.js"></script>
-    <script src="js/stats.js"></script>
-    <script src="js/slides.js"></script>
-    <script src="js/app.js"></script>
+    <!-- Screen-reader announcements -->
+    <div id="a11y-live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+    <script type="module" src="js/app.js"></script>
 </body>
 </html>

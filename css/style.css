@@ -4,7 +4,8 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Space+Grotesk:wght@400;600;700&display=swap');
 
-:root {
+:root,
+:root[data-theme="dark"] {
     --bg-dark: #0a0a0a;
     --bg-card: #151515;
     --accent-green: #25D366;
@@ -14,8 +15,11 @@
     --accent-orange: #F97316;
     --accent-yellow: #EAB308;
     --text-primary: #FFFFFF;
-    --text-secondary: rgba(255, 255, 255, 0.7);
-    --text-muted: rgba(255, 255, 255, 0.4);
+    --text-secondary: rgba(255, 255, 255, 0.75);
+    --text-muted: rgba(255, 255, 255, 0.55);
+    --grid-line: rgba(255, 255, 255, 0.08);
+    --surface: rgba(255, 255, 255, 0.05);
+    --surface-border: rgba(255, 255, 255, 0.1);
     --gradient-1: linear-gradient(135deg, #0f0c29 0%, #1a1a4e 50%, #24243e 100%);
     --gradient-2: linear-gradient(135deg, #1a0a2e 0%, #2d1b69 50%, #16213e 100%);
     --gradient-3: linear-gradient(135deg, #1e0a1e 0%, #4a1942 50%, #2d1454 100%);
@@ -1199,4 +1203,169 @@ html, body {
 
 .year-btn-all .year-value {
     font-size: 1.1rem;
+}
+
+/* ============ LIGHT THEME ============ */
+
+:root[data-theme="light"] {
+    --bg-dark: #f7f7f9;
+    --bg-card: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: rgba(15, 23, 42, 0.75);
+    --text-muted: rgba(15, 23, 42, 0.55);
+    --grid-line: rgba(15, 23, 42, 0.1);
+    --surface: rgba(15, 23, 42, 0.04);
+    --surface-border: rgba(15, 23, 42, 0.12);
+    --gradient-1: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 50%, #fce7f3 100%);
+    --gradient-2: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 50%, #fbcfe8 100%);
+    --gradient-3: linear-gradient(135deg, #fce7f3 0%, #fae8ff 50%, #ddd6fe 100%);
+    --gradient-4: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 50%, #ede9fe 100%);
+    --gradient-5: linear-gradient(135deg, #fdf2f8 0%, #f5d0fe 50%, #e9d5ff 100%);
+    --gradient-6: linear-gradient(135deg, #cffafe 0%, #a5f3fc 50%, #bae6fd 100%);
+    --gradient-7: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 50%, #bbf7d0 100%);
+    --gradient-8: linear-gradient(135deg, #fee2e2 0%, #fecaca 50%, #fbcfe8 100%);
+    --gradient-9: linear-gradient(135deg, #e0e7ff 0%, #ede9fe 50%, #f3e8ff 100%);
+    --gradient-10: linear-gradient(135deg, #e0f2fe 0%, #e0e7ff 50%, #dbeafe 100%);
+    --gradient-11: linear-gradient(135deg, #fae8ff 0%, #f3e8ff 50%, #e0e7ff 100%);
+}
+
+:root[data-theme="light"] .ranking-bar,
+:root[data-theme="light"] .how-to,
+:root[data-theme="light"] .stat-card,
+:root[data-theme="light"] .fun-fact {
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+}
+
+/* ============ THEME TOGGLE ============ */
+
+.theme-toggle {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 100;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, background 0.2s;
+}
+
+.theme-toggle:hover {
+    transform: scale(1.08);
+}
+
+.theme-toggle:focus-visible {
+    outline: 2px solid var(--accent-green);
+    outline-offset: 2px;
+}
+
+/* ============ A11Y ============ */
+
+.sr-only {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+:focus-visible {
+    outline: 2px solid var(--accent-green);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.nav-arrow:focus-visible,
+.nav-dot:focus-visible,
+.file-btn:focus-visible,
+.year-btn:focus-visible,
+.summary-btn:focus-visible,
+.summary-close:focus-visible {
+    outline: 2px solid var(--accent-green);
+    outline-offset: 3px;
+}
+
+.drop-zone:focus-visible {
+    border-color: var(--accent-green);
+    background: rgba(37, 211, 102, 0.08);
+}
+
+/* ============ NEW: Year comparison ============ */
+
+.compare-table {
+    width: 100%;
+    margin: 1.5rem auto;
+    max-width: 500px;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+.compare-table th,
+.compare-table td {
+    padding: 0.6rem 0.8rem;
+    text-align: right;
+    border-bottom: 1px solid var(--surface-border);
+}
+.compare-table th:first-child,
+.compare-table td:first-child {
+    text-align: left;
+    color: var(--text-secondary);
+}
+.compare-table th {
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ============ NEW: Unique vocabulary grid ============ */
+
+.uniq-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+.uniq-block {
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    border-radius: 12px;
+    padding: 1rem;
+    text-align: left;
+}
+.uniq-block h4 {
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+}
+
+/* ============ NEW: Plain list ============ */
+
+.plain-list {
+    list-style: none;
+    padding: 0;
+    text-align: left;
+    max-width: 500px;
+    margin: 0.5rem auto;
+}
+.plain-list li {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--surface-border);
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+.plain-list li:last-child {
+    border-bottom: none;
 }

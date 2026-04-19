@@ -1,0 +1,12 @@
+[12/03/2024 14:30:00] Alice: Bonjour tout le monde !
+[12/03/2024 14:31:15] Bob: Salut Alice, ça va ?
+[12/03/2024 14:32:00] Alice: Super et toi ? 😊
+[12/03/2024 14:35:22] Bob: Tranquille. image omitted
+[12/03/2024 23:45:00] Alice: Tu es encore debout ?
+[13/03/2024 07:15:00] Bob: Je me leve tot moi
+[13/03/2024 10:00:00] Alice: Merci beaucoup pour l'aide hier Bob tu es genial
+[13/03/2024 10:05:00] Bob: De rien
+[15/03/2024 09:00:00] Alice: Re !
+[15/03/2024 09:01:00] Bob: a réagi ❤️ à "Re !"
+[15/03/2024 09:05:00] Alice: https://example.com regardez ce lien
+[15/03/2024 09:06:00] Bob: cool
