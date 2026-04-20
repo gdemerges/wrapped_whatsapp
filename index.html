@@ -5,13 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WhatsApp Wrapped</title>
     <meta name="description" content="Analyse tes conversations WhatsApp et génère une présentation animée, 100% dans ton navigateur.">
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=2">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js" integrity="sha384-y49Zu59jZHJL/PLKgZPv3k2WI9c0Yp3pWB76V8OBVCb0QBKS8l4Ff3YslzHVX76Y" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js" integrity="sha384-0d+Gr7vM4Drod8E3hXKgciWJSWbjD/opKLLygI9ktiWbuvlDwQLzU46wJ9s5gsp7" crossorigin="anonymous"></script>
 </head>
 <body>
-    <button id="theme-toggle" class="theme-toggle" aria-label="Changer le thème" title="Changer le thème">🌙</button>
+    <button id="theme-toggle" class="theme-toggle" aria-label="Changer le thème" title="Changer le thème">
+        <svg class="theme-icon-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="theme-icon-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+    </button>
 
     <!-- Upload Screen -->
     <div id="upload-screen" class="screen active" role="region" aria-label="Écran d'import">
@@ -62,6 +65,7 @@
     <!-- Wrapped Slides -->
     <div id="wrapped-screen" class="screen" role="region" aria-label="Résultats">
         <div class="slides-container" id="slides-container"></div>
+        <div class="slide-counter" id="slide-counter" aria-hidden="true"></div>
         <div class="nav-dots" id="nav-dots" role="tablist" aria-label="Navigation entre les slides"></div>
         <button class="nav-arrow nav-prev" id="nav-prev" aria-label="Slide precedente">&larr;</button>
         <button class="nav-arrow nav-next" id="nav-next" aria-label="Slide suivante">&rarr;</button>

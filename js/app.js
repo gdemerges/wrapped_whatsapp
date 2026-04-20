@@ -43,8 +43,8 @@ function initTheme() {
 }
 
 function updateThemeBtn(btn, theme) {
-    btn.textContent = theme === 'dark' ? '☀️' : '🌙';
     btn.setAttribute('aria-label', theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre');
+    btn.setAttribute('title', theme === 'dark' ? 'Mode clair' : 'Mode sombre');
 }
 
 // ========== Screen ==========
@@ -255,7 +255,13 @@ function renderSlides(slides) {
     }
 
     initChartForSlide(0);
+    updateCounter(0);
     setupNavigation();
+}
+
+function updateCounter(index) {
+    const counter = $('#slide-counter');
+    if (counter) counter.textContent = `${index + 1} / ${totalSlides}`;
 }
 
 function initChartForSlide(index) {
@@ -301,6 +307,7 @@ function goToSlide(index) {
     }, 500);
 
     navDots.querySelectorAll('.nav-dot').forEach((dot, i) => dot.classList.toggle('active', i === index));
+    updateCounter(index);
     initChartForSlide(index);
     announce(`Slide ${index + 1} sur ${totalSlides}`);
     const hint = $('#swipe-hint');
@@ -312,8 +319,11 @@ function setupNavigation() {
     $('#nav-next').addEventListener('click', () => goToSlide(currentSlide + 1));
     document.addEventListener('keydown', (e) => {
         if (!wrappedScreen.classList.contains('active')) return;
+        if (e.target.closest('input, textarea, button[data-filter]')) return;
         if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); goToSlide(currentSlide + 1); }
-        if (e.key === 'ArrowLeft') { e.preventDefault(); goToSlide(currentSlide - 1); }
+        else if (e.key === 'ArrowLeft') { e.preventDefault(); goToSlide(currentSlide - 1); }
+        else if (e.key === 'Home') { e.preventDefault(); goToSlide(0); }
+        else if (e.key === 'End') { e.preventDefault(); goToSlide(totalSlides - 1); }
     });
 
     let touchStartX = 0, touchStartY = 0;

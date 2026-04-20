@@ -328,7 +328,7 @@ html, body {
     font-weight: 900;
     line-height: 1;
     margin-bottom: 0.25rem;
-    background: linear-gradient(135deg, #fff, rgba(255,255,255,0.8));
+    background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -1241,16 +1241,18 @@ html, body {
 
 .theme-toggle {
     position: fixed;
-    top: 1rem;
+    bottom: 1rem;
     right: 1rem;
-    z-index: 100;
-    width: 40px;
-    height: 40px;
+    z-index: 101;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
     background: var(--surface);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     border: 1px solid var(--surface-border);
     color: var(--text-primary);
-    font-size: 1.1rem;
+    font-size: 1rem;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -1260,11 +1262,20 @@ html, body {
 
 .theme-toggle:hover {
     transform: scale(1.08);
+    background: var(--surface-border);
 }
 
 .theme-toggle:focus-visible {
     outline: 2px solid var(--accent-green);
     outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+    .theme-toggle {
+        width: 34px;
+        height: 34px;
+        font-size: 0.9rem;
+    }
 }
 
 /* ============ A11Y ============ */
@@ -1368,4 +1379,145 @@ html, body {
 }
 .plain-list li:last-child {
     border-bottom: none;
+}
+
+/* ============ LIGHT THEME: fix hardcoded whites on colored gradients ============ */
+
+:root[data-theme="light"] .nav-arrow {
+    background: rgba(15, 23, 42, 0.08);
+    color: var(--text-primary);
+}
+:root[data-theme="light"] .nav-arrow:hover {
+    background: rgba(15, 23, 42, 0.15);
+}
+:root[data-theme="light"] .nav-dot {
+    background: rgba(15, 23, 42, 0.2);
+}
+:root[data-theme="light"] .nav-dot.active {
+    background: var(--text-primary);
+}
+:root[data-theme="light"] .reset-btn,
+:root[data-theme="light"] .summary-btn {
+    background: rgba(15, 23, 42, 0.08);
+    border-color: rgba(15, 23, 42, 0.12);
+    color: var(--text-primary);
+}
+:root[data-theme="light"] .reset-btn:hover,
+:root[data-theme="light"] .summary-btn:hover {
+    background: rgba(15, 23, 42, 0.15);
+    color: var(--text-primary);
+}
+:root[data-theme="light"] .slide-tag {
+    background: rgba(15, 23, 42, 0.08);
+    color: var(--text-secondary);
+}
+:root[data-theme="light"] .stat-card,
+:root[data-theme="light"] .fun-fact {
+    background: rgba(255, 255, 255, 0.6);
+    border-color: rgba(15, 23, 42, 0.1);
+}
+:root[data-theme="light"] .ranking-bar {
+    background: rgba(15, 23, 42, 0.08);
+}
+:root[data-theme="light"] .heatmap-cell {
+    /* Cell inline background wins; labels need dark color though */
+}
+:root[data-theme="light"] .drop-zone {
+    border-color: rgba(15, 23, 42, 0.2);
+}
+:root[data-theme="light"] .drop-zone:hover,
+:root[data-theme="light"] .drop-zone.dragover {
+    background: rgba(37, 211, 102, 0.08);
+}
+:root[data-theme="light"] .how-to {
+    background: rgba(255, 255, 255, 0.6);
+    border-color: rgba(15, 23, 42, 0.08);
+}
+:root[data-theme="light"] .loading-spinner {
+    border-color: rgba(15, 23, 42, 0.1);
+    border-top-color: var(--accent-green);
+}
+:root[data-theme="light"] .filter-btn {
+    background: rgba(15, 23, 42, 0.06);
+    color: var(--text-secondary);
+}
+:root[data-theme="light"] .filter-btn.active {
+    background: var(--accent-purple);
+    color: #fff;
+}
+:root[data-theme="light"] .word-tag {
+    /* inline color preserved, just ensure legibility */
+}
+/* Summary panel stays dark in both themes (intentional — data-heavy view) */
+
+/* ============ REDUCED MOTION ============ */
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+    .loading-spinner {
+        animation: none;
+        border-top-color: transparent;
+    }
+}
+
+/* ============ SMOOTHER THEME TRANSITION ============ */
+
+html {
+    transition: background 0.3s ease;
+}
+body {
+    transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* ============ THEME ICON SWAP ============ */
+
+.theme-toggle .theme-icon-sun { display: none; }
+.theme-toggle .theme-icon-moon { display: block; }
+:root[data-theme="dark"] .theme-toggle .theme-icon-sun { display: block; }
+:root[data-theme="dark"] .theme-toggle .theme-icon-moon { display: none; }
+
+/* ============ SLIDE COUNTER ============ */
+
+.slide-counter {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    background: var(--surface);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--surface-border);
+    padding: 0.35rem 0.8rem;
+    border-radius: 50px;
+    pointer-events: none;
+    tabular-nums: true;
+    font-variant-numeric: tabular-nums;
+}
+
+:root[data-theme="light"] .slide-counter {
+    background: rgba(255, 255, 255, 0.7);
+    border-color: rgba(15, 23, 42, 0.1);
+    color: var(--text-secondary);
+}
+
+@media (max-width: 640px) {
+    .slide-counter {
+        font-size: 0.7rem;
+        padding: 0.3rem 0.65rem;
+    }
+}
+
+/* Hide counter on upload/loading screens (it lives inside wrapped-screen already) */
+#wrapped-screen:not(.active) .slide-counter {
+    display: none;
 }
