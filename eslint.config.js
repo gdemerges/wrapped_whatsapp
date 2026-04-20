@@ -9,6 +9,7 @@ export default [
                 navigator: 'readonly',
                 self: 'readonly',
                 localStorage: 'readonly',
+                sessionStorage: 'readonly',
                 history: 'readonly',
                 location: 'readonly',
                 requestAnimationFrame: 'readonly',

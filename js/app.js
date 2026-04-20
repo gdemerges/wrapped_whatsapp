@@ -3,7 +3,6 @@
  */
 
 import { generateSlides } from './slides.js';
-import { escapeHtml, fmt, fmtDate } from './utils.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -133,7 +132,6 @@ async function handleFile(file) {
         loadingStatus.textContent = 'Generation du Wrapped...';
         const slides = generateSlides(currentStats, currentComparison);
         renderSlides(slides);
-        buildSummary(currentStats);
         showScreen(wrappedScreen);
         announce(`${currentStats.totalMessages} messages analyses`);
     } catch (err) {
@@ -349,54 +347,20 @@ function setupNavigation() {
     }, { passive: true });
 }
 
-// ========== Summary ==========
-const summaryOverlay = $('#summary-overlay');
-const summaryContent = $('#summary-content');
-$('#summary-btn').addEventListener('click', () => summaryOverlay.classList.add('active'));
-$('#summary-close').addEventListener('click', () => summaryOverlay.classList.remove('active'));
-summaryOverlay.addEventListener('click', (e) => { if (e.target === summaryOverlay) summaryOverlay.classList.remove('active'); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') summaryOverlay.classList.remove('active'); });
-
-function buildSummary(stats) {
-    let html = `
-        <section class="summary-section">
-            <h3>Vue d'ensemble</h3>
-            <table class="summary-table">
-                <tr><td>Periode</td><td>${fmtDate(stats.startDate)} — ${fmtDate(stats.endDate)}</td></tr>
-                <tr><td>Duree</td><td>${stats.totalDays} jours</td></tr>
-                <tr><td>Participants</td><td>${stats.participants}</td></tr>
-                <tr><td>Total messages</td><td>${fmt(stats.totalMessages)}</td></tr>
-                <tr><td>Moyenne / jour</td><td>${stats.avgPerDay}</td></tr>
-                <tr><td>Total caracteres</td><td>${fmt(stats.totalChars)}</td></tr>
-                <tr><td>Longueur moy. message</td><td>${stats.avgMsgLen} car.</td></tr>
-                <tr><td>Medias partages</td><td>${fmt(stats.totalMedia)}</td></tr>
-                <tr><td>Liens partages</td><td>${fmt(stats.totalLinks)}</td></tr>
-                <tr><td>Messages modifies</td><td>${fmt(stats.totalEdited)}</td></tr>
-                <tr><td>Emojis envoyes</td><td>${fmt(stats.emojis.total)} (${stats.emojis.unique} differents)</td></tr>
-                <tr><td>Reactions</td><td>${fmt(stats.reactions?.total || 0)}</td></tr>
-                <tr><td>Grands silences (&gt;24h)</td><td>${fmt(stats.ghosting?.count || 0)}</td></tr>
-                <tr><td>Meilleur streak</td><td>${stats.streak.max} jours consecutifs</td></tr>
-                <tr><td>Langue detectee</td><td>${(stats.lang || 'fr').toUpperCase()}</td></tr>
-            </table>
-        </section>
-        <section class="summary-section">
-            <h3>Classement</h3>
-            <table class="summary-table summary-table-full">
-                <thead><tr><th>#</th><th>Nom</th><th>Messages</th><th>%</th><th>Moy. car.</th><th>Medias</th><th>Emojis</th></tr></thead>
-                <tbody>${stats.ranking.map(([name, d], i) => {
-                    const em = stats.emojis.perPerson.find(e => e[0] === name)?.[1] || 0;
-                    return `<tr><td>${i + 1}</td><td>${escapeHtml(name)}</td><td>${fmt(d.count)}</td><td>${d.percent}%</td><td>${d.avgLen}</td><td>${d.media}</td><td>${fmt(em)}</td></tr>`;
-                }).join('')}</tbody>
-            </table>
-        </section>`;
-
-    if (stats.compatibility) {
-        const c = stats.compatibility;
-        html += `<section class="summary-section"><h3>Compatibilite</h3><table class="summary-table"><tr><td>Score</td><td>${c.score}/100</td></tr><tr><td>Longueurs similaires</td><td>${c.components.lengthSimilarity}</td></tr><tr><td>Equilibre</td><td>${c.components.volumeBalance}</td></tr><tr><td>Reciprocite</td><td>${c.components.reciprocity}</td></tr><tr><td>Regularite</td><td>${c.components.consistency}</td></tr></table></section>`;
+// ========== Summary → Dashboard ==========
+$('#summary-btn').addEventListener('click', () => {
+    if (!currentStats) return;
+    try {
+        sessionStorage.setItem('ww-stats', JSON.stringify({
+            stats: serializeStats(currentStats),
+            comparison: currentComparison,
+        }));
+    } catch (e) {
+        console.error('Failed to save stats:', e);
+        return;
     }
-
-    summaryContent.innerHTML = html;
-}
+    window.location.href = 'dashboard.html';
+});
 
 // ========== Sharing ==========
 function serializeStats(stats) {
@@ -449,7 +413,6 @@ function tryLoadFromURL() {
         currentComparison = payload.c || null;
         const slides = generateSlides(stats, currentComparison);
         renderSlides(slides);
-        buildSummary(stats);
         showScreen(wrappedScreen);
         return true;
     } catch (e) {

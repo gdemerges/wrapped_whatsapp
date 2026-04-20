@@ -1,0 +1,386 @@
+/* ============================================
+   Dashboard page — standalone data view
+   ============================================ */
+
+html:has(.dashboard-body),
+html:has(.dashboard-body) body {
+    height: auto;
+    overflow: visible;
+}
+
+.dashboard-body {
+    overflow: visible;
+    min-height: 100%;
+    height: auto;
+    background: var(--bg-dark);
+    padding-bottom: 4rem;
+}
+
+.dashboard-body .screen {
+    position: static;
+    display: block;
+    min-height: auto;
+}
+
+/* ---- Header ---- */
+.dash-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1.25rem;
+    background: color-mix(in srgb, var(--bg-dark) 80%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--surface-border);
+}
+
+.dash-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 900;
+    letter-spacing: -0.5px;
+    flex: 1;
+    text-align: center;
+}
+
+.dash-back,
+.dash-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.85rem;
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    border-radius: 50px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, transform 0.2s;
+}
+
+.dash-back:hover,
+.dash-action:hover {
+    background: var(--surface-border);
+    color: var(--text-primary);
+}
+
+.dash-back:focus-visible,
+.dash-action:focus-visible {
+    outline: 2px solid var(--accent-green);
+    outline-offset: 2px;
+}
+
+/* ---- Content ---- */
+.dash-content {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem;
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 1rem;
+}
+
+.dash-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 4rem 1rem;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* ---- Cards ---- */
+.dash-card {
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    border-radius: 16px;
+    padding: 1.25rem 1.25rem;
+    min-width: 0;
+}
+
+.dash-card h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--accent-purple);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.9rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--surface-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.dash-card h2 .dash-meta {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+/* Column spans */
+.col-4 { grid-column: span 4; }
+.col-6 { grid-column: span 6; }
+.col-8 { grid-column: span 8; }
+.col-12 { grid-column: span 12; }
+
+@media (max-width: 900px) {
+    .col-4, .col-6, .col-8 { grid-column: span 12; }
+}
+
+/* ---- Hero stats ---- */
+.dash-hero {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.1));
+    border: 1px solid var(--surface-border);
+    border-radius: 20px;
+}
+
+.dash-hero-item {
+    text-align: center;
+}
+
+.dash-hero-value {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 2rem;
+    font-weight: 900;
+    line-height: 1.1;
+    background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.dash-hero-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 0.25rem;
+}
+
+.dash-hero-period {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+/* ---- Data tables ---- */
+.dash-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+}
+
+.dash-table th,
+.dash-table td {
+    padding: 0.55rem 0.4rem;
+    border-bottom: 1px solid var(--surface-border);
+    text-align: right;
+}
+
+.dash-table th {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.dash-table th:first-child,
+.dash-table td:first-child {
+    text-align: left;
+}
+
+.dash-table tr:last-child td {
+    border-bottom: none;
+}
+
+.dash-table tbody tr:hover {
+    background: var(--surface-border);
+}
+
+.dash-table .dash-rank {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    width: 2rem;
+    font-weight: 700;
+}
+
+.dash-table .dash-rank.gold { color: #EAB308; }
+.dash-table .dash-rank.silver { color: #94A3B8; }
+.dash-table .dash-rank.bronze { color: #CD7F32; }
+
+/* ---- KV list ---- */
+.dash-kv {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.55rem 1rem;
+    font-size: 0.88rem;
+}
+
+.dash-kv dt {
+    color: var(--text-muted);
+}
+
+.dash-kv dd {
+    text-align: right;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* ---- Emoji / word chips ---- */
+.dash-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.dash-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.7rem;
+    background: var(--surface-border);
+    border-radius: 50px;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.dash-chip .count {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- Chart wrappers ---- */
+.dash-chart {
+    position: relative;
+    width: 100%;
+    min-height: 240px;
+}
+
+/* ---- Heatmap reused from slides ---- */
+.dash-card .heatmap-grid {
+    margin-top: 0.5rem;
+}
+
+/* ---- Per-person signature ---- */
+.dash-signature {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.dash-sig-block {
+    padding: 0.75rem;
+    background: var(--surface-border);
+    border-radius: 10px;
+}
+
+.dash-sig-block h4 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+}
+
+/* ---- Compatibility score ---- */
+.dash-compat {
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.dash-compat-score {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 3.5rem;
+    font-weight: 900;
+    line-height: 1;
+    background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.dash-compat-max {
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.dash-compat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.dash-compat-cell {
+    padding: 0.6rem;
+    background: var(--surface-border);
+    border-radius: 10px;
+    text-align: left;
+}
+
+.dash-compat-cell dt {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
+}
+
+.dash-compat-cell dd {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 800;
+}
+
+/* ---- Fun facts ---- */
+.dash-facts {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.dash-fact {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    padding: 0.6rem 0.75rem;
+    background: var(--surface-border);
+    border-radius: 10px;
+    font-size: 0.88rem;
+    line-height: 1.4;
+}
+
+.dash-fact-icon {
+    font-size: 1.3rem;
+    flex-shrink: 0;
+}
+
+/* ---- Light theme overrides ---- */
+:root[data-theme="light"] .dash-hero {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.08));
+}
+
+:root[data-theme="light"] .dash-table tbody tr:hover {
+    background: rgba(15, 23, 42, 0.04);
+}
