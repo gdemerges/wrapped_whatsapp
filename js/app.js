@@ -22,6 +22,10 @@ let slideElements = [];
 let chartInitialized = {};
 let currentStats = null;
 let currentComparison = null;
+let currentText = null;
+let availableYears = [];
+let availableYearCounts = {};
+let currentYear = null;
 
 // ========== Theme ==========
 initTheme();
@@ -113,6 +117,10 @@ async function handleFile(file) {
         const yearsInfo = await callWorker(text);
         if (yearsInfo.kind !== 'years') throw new Error('Reponse worker invalide');
 
+        currentText = text;
+        availableYears = yearsInfo.years;
+        availableYearCounts = yearsInfo.yearCounts;
+
         let selectedYear = null;
         if (yearsInfo.years.length > 1) {
             showScreen(uploadScreen);
@@ -121,6 +129,7 @@ async function handleFile(file) {
         } else {
             selectedYear = yearsInfo.years[0];
         }
+        currentYear = selectedYear;
 
         loadingStatus.textContent = 'Calcul des stats...';
         const result = await callWorker(text, selectedYear);
@@ -204,6 +213,7 @@ function pickYear(years, yearCounts) {
 function renderSlides(slides) {
     slidesContainer.innerHTML = '';
     navDots.innerHTML = '';
+    wrappedScreen.querySelectorAll('.reset-btn, .year-change-btn').forEach(b => b.remove());
     slideElements = [];
     chartInitialized = {};
     totalSlides = slides.length;
@@ -237,6 +247,36 @@ function renderSlides(slides) {
         location.reload();
     });
     wrappedScreen.appendChild(resetBtn);
+
+    if (availableYears.length > 1 && currentText) {
+        const yearBtn = document.createElement('button');
+        yearBtn.className = 'year-change-btn';
+        const label = currentYear == null ? 'Toutes les années' : String(currentYear);
+        yearBtn.textContent = `📅 ${label}`;
+        yearBtn.setAttribute('aria-label', 'Changer l\'année analysée');
+        yearBtn.addEventListener('click', async () => {
+            showScreen(uploadScreen);
+            const chosen = await pickYear(availableYears, availableYearCounts);
+            if (chosen === currentYear) { showScreen(wrappedScreen); return; }
+            currentYear = chosen;
+            showScreen(loadingScreen);
+            loadingStatus.textContent = 'Calcul des stats...';
+            try {
+                const result = await callWorker(currentText, currentYear);
+                if (result.kind !== 'stats') throw new Error('Calcul echoue');
+                currentStats = rehydrateDates(result.stats);
+                currentComparison = result.comparison;
+                const newSlides = generateSlides(currentStats, currentComparison);
+                renderSlides(newSlides);
+                showScreen(wrappedScreen);
+            } catch (err) {
+                console.error(err);
+                alert('Erreur : ' + err.message);
+                showScreen(wrappedScreen);
+            }
+        });
+        wrappedScreen.appendChild(yearBtn);
+    }
 
     const lastSlide = slideElements[slideElements.length - 1];
     const analyserBtn = lastSlide.querySelector('.file-btn');
@@ -355,6 +395,7 @@ $('#summary-btn').addEventListener('click', () => {
             stats: serializeStats(currentStats),
             comparison: currentComparison,
         }));
+        sessionStorage.setItem('ww-slides-pending', '1');
     } catch (e) {
         console.error('Failed to save stats:', e);
         return;
@@ -421,4 +462,24 @@ function tryLoadFromURL() {
     }
 }
 
-tryLoadFromURL();
+function tryLoadFromSession() {
+    if (!sessionStorage.getItem('ww-slides-pending')) return false;
+    sessionStorage.removeItem('ww-slides-pending');
+    try {
+        const raw = sessionStorage.getItem('ww-stats');
+        if (!raw) return false;
+        const payload = JSON.parse(raw);
+        const stats = rehydrateDates(payload.stats);
+        currentStats = stats;
+        currentComparison = payload.comparison || null;
+        const slides = generateSlides(stats, currentComparison);
+        renderSlides(slides);
+        showScreen(wrappedScreen);
+        return true;
+    } catch (e) {
+        console.error('Failed to load from session:', e);
+        return false;
+    }
+}
+
+if (!tryLoadFromURL()) tryLoadFromSession();

@@ -869,6 +869,40 @@ html, body {
     background: rgba(255, 255, 255, 0.2);
 }
 
+/* Year change button */
+.year-change-btn {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--text-secondary);
+    padding: 0.5rem 1rem;
+    border-radius: 50px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: inherit;
+    font-weight: 600;
+    z-index: 200;
+    transition: all 0.2s;
+    backdrop-filter: blur(8px);
+    white-space: nowrap;
+}
+.year-change-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+:root[data-theme="light"] .year-change-btn {
+    background: rgba(15, 23, 42, 0.08);
+    border-color: rgba(15, 23, 42, 0.12);
+    color: var(--text-primary);
+}
+:root[data-theme="light"] .year-change-btn:hover {
+    background: rgba(15, 23, 42, 0.15);
+    color: var(--text-primary);
+}
+
 /* Year picker overlay */
 /* Summary button */
 .summary-btn {
@@ -1079,6 +1113,11 @@ html, body {
     }
 
     .summary-btn {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.75rem;
+    }
+
+    .year-change-btn {
         padding: 0.4rem 0.75rem;
         font-size: 0.75rem;
     }
@@ -1303,6 +1342,7 @@ html, body {
 .file-btn:focus-visible,
 .year-btn:focus-visible,
 .summary-btn:focus-visible,
+.year-change-btn:focus-visible,
 .summary-close:focus-visible {
     outline: 2px solid var(--accent-green);
     outline-offset: 3px;
