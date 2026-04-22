@@ -1,0 +1,12 @@
+# Dépendances et artefacts générés
+node_modules/
+dist/
+coverage/
+.vitest/
+package-lock.json
+
+# OS
+.DS_Store
+
+# Données de test (fichiers de chat potentiellement sensibles)
+tests/fixtures/
