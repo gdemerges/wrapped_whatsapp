@@ -3,6 +3,7 @@
  */
 
 import { generateSlides } from './slides.js';
+import { serializeStats, rehydrateDates, buildShareURL } from './payload.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -195,17 +196,6 @@ function loadJSZip() {
     });
 }
 
-function rehydrateDates(stats) {
-    stats.startDate = new Date(stats.startDate);
-    stats.endDate = new Date(stats.endDate);
-    if (stats.firstMessage?.datetime) stats.firstMessage.datetime = new Date(stats.firstMessage.datetime);
-    if (stats.longestMessage?.datetime) stats.longestMessage.datetime = new Date(stats.longestMessage.datetime);
-    if (stats.ghosting?.longest) {
-        stats.ghosting.longest = stats.ghosting.longest.map(g => ({ ...g, when: new Date(g.when) }));
-    }
-    return stats;
-}
-
 // ========== Year picker ==========
 function pickYear(years, yearCounts) {
     return new Promise((resolve) => {
@@ -331,7 +321,7 @@ function renderSlides(slides) {
         shareBtn.textContent = 'Partager';
         shareBtn.addEventListener('click', () => {
             if (!currentStats) return;
-            copyToClipboard(buildShareURL(currentStats));
+            copyToClipboard(buildShareURL(currentStats, currentComparison, { dropDaily: true }));
         });
         analyserBtn.parentNode.insertBefore(shareBtn, analyserBtn);
     }
@@ -448,23 +438,6 @@ $('#summary-btn').addEventListener('click', () => {
 });
 
 // ========== Sharing ==========
-function serializeStats(stats) {
-    const s = JSON.parse(JSON.stringify(stats));
-    s.startDate = stats.startDate.toISOString();
-    s.endDate = stats.endDate.toISOString();
-    if (s.firstMessage?.datetime) s.firstMessage.datetime = stats.firstMessage.datetime.toISOString();
-    if (s.longestMessage?.datetime) s.longestMessage.datetime = stats.longestMessage.datetime.toISOString();
-    delete s.daily;
-    if (s.ghosting?.longest) s.ghosting.longest = s.ghosting.longest.map(g => ({ ...g, when: new Date(g.when).toISOString() }));
-    return s;
-}
-
-function buildShareURL(stats) {
-    const payload = { s: serializeStats(stats), c: currentComparison };
-    const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(payload));
-    return window.location.origin + window.location.pathname + '#share=' + compressed;
-}
-
 function showToast(message) {
     const toast = $('#share-toast');
     toast.textContent = message;

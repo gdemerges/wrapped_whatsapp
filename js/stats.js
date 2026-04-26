@@ -140,7 +140,15 @@ export function compute(messages) {
         if (!stats.firstMessage) stats.firstMessage = m;
     }
 
-    stats.longestMessage = longestMsg || { msgLen: 0, author: '', message: '', datetime: null };
+    stats.longestMessage = longestMsg
+        ? { author: longestMsg.author, datetime: longestMsg.datetime, msgLen: longestMsg.msgLen }
+        : { author: '', datetime: null, msgLen: 0 };
+    if (stats.firstMessage) {
+        stats.firstMessage = {
+            author: stats.firstMessage.author,
+            datetime: stats.firstMessage.datetime,
+        };
+    }
 
     return finalize(stats, messages);
 }
