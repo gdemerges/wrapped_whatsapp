@@ -95,7 +95,37 @@ dropZone.addEventListener('drop', (e) => {
     if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
 });
 
+let dragDepth = 0;
+window.addEventListener('dragenter', (e) => {
+    if (!e.dataTransfer?.types?.includes('Files')) return;
+    if (!uploadScreen.classList.contains('active')) return;
+    dragDepth++;
+    document.body.classList.add('dragging-file');
+});
+window.addEventListener('dragleave', () => {
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) document.body.classList.remove('dragging-file');
+});
+window.addEventListener('dragover', (e) => {
+    if (e.dataTransfer?.types?.includes('Files')) e.preventDefault();
+});
+window.addEventListener('drop', (e) => {
+    if (!e.dataTransfer?.files?.length) return;
+    if (!uploadScreen.classList.contains('active')) return;
+    e.preventDefault();
+    dragDepth = 0;
+    document.body.classList.remove('dragging-file');
+    if (!dropZone.contains(e.target)) handleFile(e.dataTransfer.files[0]);
+});
+
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+
 async function handleFile(file) {
+    if (file.size > MAX_FILE_SIZE) {
+        showError(`Fichier trop volumineux (max ${Math.round(MAX_FILE_SIZE / 1024 / 1024)} Mo)`);
+        return;
+    }
+
     showScreen(loadingScreen);
     announce('Analyse en cours');
 
@@ -107,7 +137,9 @@ async function handleFile(file) {
             const zip = await JSZip.loadAsync(file);
             const txtFile = Object.values(zip.files).find(f => f.name.endsWith('.txt'));
             if (!txtFile) throw new Error('Aucun fichier .txt trouvé dans le ZIP');
-            text = await txtFile.async('string');
+            text = await txtFile.async('string', (meta) => {
+                loadingStatus.textContent = `Decompression... ${Math.round(meta.percent)}%`;
+            });
         } else {
             loadingStatus.textContent = 'Lecture du fichier...';
             text = await file.text();
@@ -145,7 +177,7 @@ async function handleFile(file) {
         announce(`${currentStats.totalMessages} messages analyses`);
     } catch (err) {
         console.error(err);
-        alert('Erreur : ' + err.message);
+        showError(err.message);
         showScreen(uploadScreen);
     }
 }
@@ -244,7 +276,19 @@ function renderSlides(slides) {
     resetBtn.setAttribute('aria-label', 'Analyser un autre fichier');
     resetBtn.addEventListener('click', () => {
         history.replaceState(null, '', window.location.pathname);
-        location.reload();
+        currentStats = null;
+        currentComparison = null;
+        currentText = null;
+        availableYears = [];
+        availableYearCounts = {};
+        currentYear = null;
+        slidesContainer.innerHTML = '';
+        navDots.innerHTML = '';
+        wrappedScreen.querySelectorAll('.reset-btn, .year-change-btn').forEach(b => b.remove());
+        slideElements = [];
+        chartInitialized = {};
+        fileInput.value = '';
+        showScreen(uploadScreen);
     });
     wrappedScreen.appendChild(resetBtn);
 
@@ -271,7 +315,7 @@ function renderSlides(slides) {
                 showScreen(wrappedScreen);
             } catch (err) {
                 console.error(err);
-                alert('Erreur : ' + err.message);
+                showError(err.message);
                 showScreen(wrappedScreen);
             }
         });
@@ -424,8 +468,17 @@ function buildShareURL(stats) {
 function showToast(message) {
     const toast = $('#share-toast');
     toast.textContent = message;
+    toast.classList.remove('error');
     toast.classList.add('visible');
     setTimeout(() => toast.classList.remove('visible'), 2000);
+}
+
+function showError(message) {
+    const toast = $('#share-toast');
+    toast.textContent = 'Erreur : ' + message;
+    toast.classList.add('error', 'visible');
+    announce('Erreur : ' + message);
+    setTimeout(() => toast.classList.remove('visible'), 4000);
 }
 
 function copyToClipboard(text) {

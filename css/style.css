@@ -1167,6 +1167,21 @@ html, body {
     transform: translateX(-50%) translateY(0);
 }
 
+.share-toast.error {
+    background: var(--accent-pink, #EC4899);
+    color: #fff;
+}
+
+body.dragging-file::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: rgba(139, 92, 246, 0.12);
+    border: 3px dashed var(--accent-purple, #8B5CF6);
+    pointer-events: none;
+    z-index: 500;
+}
+
 /* Year picker overlay */
 .year-picker-overlay {
     position: fixed;
