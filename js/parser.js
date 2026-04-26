@@ -45,13 +45,14 @@ const REACTION_RE = /^(?:a réagi|reacted|a aimé|liked)\s+((?:\p{Extended_Picto
  * Requires ≥3 matches in the first 100 lines to avoid false positives.
  */
 export function detectPattern(lines) {
+    const sampleSize = Math.min(100, lines.length);
+    const threshold = Math.max(1, Math.min(3, Math.floor(sampleSize / 3)));
     for (const pattern of PATTERNS) {
         let matches = 0;
-        const testLines = lines.slice(0, Math.min(100, lines.length));
-        for (const line of testLines) {
-            if (pattern.test(line)) matches++;
+        for (let i = 0; i < sampleSize; i++) {
+            if (pattern.test(lines[i])) matches++;
         }
-        if (matches >= 3) return pattern;
+        if (matches >= threshold) return pattern;
     }
     return null;
 }

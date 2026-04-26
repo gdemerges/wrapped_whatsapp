@@ -10,6 +10,7 @@ import { computeSentiment } from './lang/sentiment.js';
 const EMOJI_RE = /\p{Extended_Pictographic}\uFE0F?(?:\u200D\p{Extended_Pictographic}\uFE0F?)*/gu;
 const WORD_RE = /[a-zàâäéèêëïîôùûüÿçœæ']+/gi;
 const URL_RE = /https?:\/\/\S+/g;
+const URL_TEST_RE = /https?:\/\/\S+/;
 const HTML_STRIP_RE = /<[^>]+>/g;
 const GHOST_THRESHOLD_MIN = 60 * 24; // 24h = ghosted
 
@@ -74,8 +75,7 @@ export function compute(messages) {
 
         if (m.isEdited) { stats.totalEdited++; person.edited++; }
 
-        if (URL_RE.test(m.message)) { stats.totalLinks++; person.links++; }
-        URL_RE.lastIndex = 0;
+        if (URL_TEST_RE.test(m.message)) { stats.totalLinks++; person.links++; }
 
         // --- Reactions ---
         if (m.isReaction) {
@@ -200,9 +200,9 @@ function bucketMediaType(mediaTypes, msg) {
 }
 
 function finalize(acc, messages) {
-    const dates = messages.map(m => m.datetime);
-    const startDate = new Date(Math.min(...dates));
-    const endDate = new Date(Math.max(...dates));
+    // messages are sorted chronologically in compute()
+    const startDate = new Date(messages[0].datetime);
+    const endDate = new Date(messages[messages.length - 1].datetime);
     const totalDays = Math.ceil((endDate - startDate) / 86400000) + 1;
 
     // Per-person derived metrics
