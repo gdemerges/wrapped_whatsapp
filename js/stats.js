@@ -5,7 +5,6 @@
 
 import { DAYS_FR, localDayKey, localMonthKey } from './utils.js';
 import { stopwordsFor, detectLanguage } from './lang/stopwords.js';
-import { computeSentiment } from './lang/sentiment.js';
 
 const EMOJI_RE = /\p{Extended_Pictographic}\uFE0F?(?:\u200D\p{Extended_Pictographic}\uFE0F?)*/gu;
 const WORD_RE = /[a-zàâäéèêëïîôùûüÿçœæ']+/gi;
@@ -312,9 +311,6 @@ function finalize(acc, messages) {
         ghostSilenced[g.silenced] = (ghostSilenced[g.silenced] || 0) + 1;
     }
 
-    // Sentiment
-    const sentiment = computeSentiment(messages);
-
     // Compatibility (for 2-person conversations)
     const compatibility = ranking.length === 2
         ? computeCompatibility(perPerson, ranking, acc)
@@ -372,7 +368,7 @@ function finalize(acc, messages) {
             revivers: Object.entries(ghostInitiator).sort((a, b) => b[1] - a[1]),
             silenced: Object.entries(ghostSilenced).sort((a, b) => b[1] - a[1]),
         },
-        sentiment,
+        sentiment: null,
         compatibility,
     };
 

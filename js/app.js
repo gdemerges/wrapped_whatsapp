@@ -70,6 +70,8 @@ function callWorker(text, year) {
             if (e.data.kind === 'error') {
                 worker.removeEventListener('message', onMsg);
                 reject(new Error(e.data.message));
+            } else if (e.data.kind === 'progress') {
+                loadingStatus.textContent = e.data.text;
             } else {
                 worker.removeEventListener('message', onMsg);
                 resolve(e.data);
