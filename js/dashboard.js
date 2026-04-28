@@ -249,22 +249,74 @@ function initiatorCard(s) {
 
 function sentimentCard(s) {
     const st = s.sentiment;
+    const mlBadge = st.mlEnabled
+        ? `<span style="font-size:0.75rem;opacity:0.7;margin-left:0.5rem;">IA (${st.device ?? 'wasm'}${st.ironyModel ? ' + ironie' : ''})</span>`
+        : `<span style="font-size:0.75rem;opacity:0.5;margin-left:0.5rem;">lexique seulement</span>`;
+
     const rows = (st.perPerson || []).map(p => {
-        const rate = (p.rate * 100).toFixed(2);
-        return `<tr><td>${escapeHtml(p.author)}</td><td>${fmt(p.pos)}</td><td>${fmt(p.neg)}</td><td>${fmt(p.compliment)}</td><td>${fmt(p.insult)}</td><td>${p.rate > 0 ? '+' : ''}${rate}%</td></tr>`;
+        const ratePct = (p.rate * 100).toFixed(1);
+        const sampled = p.sampled > 0 ? `<span title="${p.sampled} msgs analyses" style="opacity:0.5;font-size:0.8em;">(${p.sampled})</span>` : '';
+        return `<tr>
+            <td>${escapeHtml(p.author)}</td>
+            <td>${fmt(p.pos)}</td>
+            <td>${fmt(p.neg)}</td>
+            <td>${fmt(p.compliment)}</td>
+            <td>${fmt(p.insult)}</td>
+            <td>${p.rate > 0 ? '+' : ''}${ratePct}% ${sampled}</td>
+            <td>${p.stdDev > 0 ? p.stdDev.toFixed(2) : '—'}</td>
+            <td>${p.sarcasmHits > 0 ? p.sarcasmHits : '—'}</td>
+        </tr>`;
     }).join('');
+
     const highlights = [];
-    if (st.sweetest?.compliment) highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">💖</span><div><strong>${escapeHtml(st.sweetest.author)}</strong> est la personne la plus douce (${st.sweetest.compliment} compliments)</div></div>`);
-    if (st.sharpest?.insult) highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">🌶️</span><div><strong>${escapeHtml(st.sharpest.author)}</strong> pique le plus (${st.sharpest.insult} piques)</div></div>`);
-    if (st.mostPositive) highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">☀️</span><div><strong>${escapeHtml(st.mostPositive.author)}</strong> a le ton le plus positif</div></div>`);
+    if (st.sweetest?.compliment)  highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">💖</span><div><strong>${escapeHtml(st.sweetest.author)}</strong> est la personne la plus douce (${st.sweetest.compliment} compliments)</div></div>`);
+    if (st.sharpest?.insult)      highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">🌶️</span><div><strong>${escapeHtml(st.sharpest.author)}</strong> pique le plus (${st.sharpest.insult} piques)</div></div>`);
+    if (st.mostPositive)          highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">☀️</span><div><strong>${escapeHtml(st.mostPositive.author)}</strong> a le ton le plus positif (${(st.mostPositive.rate * 100).toFixed(1)}%)</div></div>`);
+    if (st.mostVolatile)          highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">🎢</span><div><strong>${escapeHtml(st.mostVolatile.author)}</strong> est le plus en montagnes russes (σ = ${st.mostVolatile.stdDev.toFixed(2)})</div></div>`);
+    if (st.mostStable && st.perPerson.length > 1)
+                                  highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">🧘</span><div><strong>${escapeHtml(st.mostStable.author)}</strong> est le plus constant (σ = ${st.mostStable.stdDev.toFixed(2)})</div></div>`);
+    if (st.mostBeloved)           highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">💝</span><div><strong>${escapeHtml(st.mostBeloved.author)}</strong> recoit les reactions les plus chaleureuses (${(st.mostBeloved.reactionsReceivedMean * 100).toFixed(0)}%, ${st.mostBeloved.reactionsReceived} reactions)</div></div>`);
+    if (st.mostExpressive && st.perPerson.length > 1)
+                                  highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">🎭</span><div><strong>${escapeHtml(st.mostExpressive.author)}</strong> reagit le plus souvent (${st.mostExpressive.reactionsSent} reactions emises)</div></div>`);
+
+    const hasReactions = (st.perPerson || []).some(p => p.reactionsSent > 0 || p.reactionsReceived > 0);
+    const reactionRows = !hasReactions ? '' : (st.perPerson || []).map(p => {
+        const sentPct = p.reactionsSent > 0 ? `${p.reactionsSentMean >= 0 ? '+' : ''}${(p.reactionsSentMean * 100).toFixed(0)}%` : '—';
+        const recPct  = p.reactionsReceived > 0 ? `${p.reactionsReceivedMean >= 0 ? '+' : ''}${(p.reactionsReceivedMean * 100).toFixed(0)}%` : '—';
+        return `<tr>
+            <td>${escapeHtml(p.author)}</td>
+            <td>${fmt(p.reactionsSent)} <span style="opacity:0.5;font-size:0.85em;">${sentPct}</span></td>
+            <td>${fmt(p.reactionsReceived)} <span style="opacity:0.5;font-size:0.85em;">${recPct}</span></td>
+        </tr>`;
+    }).join('');
+
+    const afterRows = Object.entries(st.afterAuthor || {})
+        .sort((a, b) => Math.abs(b[1].mean) - Math.abs(a[1].mean))
+        .map(([author, { mean, count }]) => {
+            const pct = (mean * 100).toFixed(1);
+            return `<tr><td>${escapeHtml(author)}</td><td>${mean >= 0 ? '+' : ''}${pct}%</td><td style="opacity:0.5;font-size:0.85em;">${count} signaux</td></tr>`;
+        }).join('');
+
     return `
     <section class="dash-card col-12">
-        <h2>Sentiment & ton</h2>
+        <h2>Sentiment & ton ${mlBadge}</h2>
         <div class="dash-facts" style="margin-bottom:1rem;">${highlights.join('')}</div>
         <table class="dash-table">
-            <thead><tr><th>Personne</th><th>Positif</th><th>Negatif</th><th>Compliments</th><th>Piques</th><th>Ratio</th></tr></thead>
+            <thead><tr><th>Personne</th><th>Positif</th><th>Negatif</th><th>Compliments</th><th>Piques</th><th>Ratio</th><th>σ</th><th>Ironie</th></tr></thead>
             <tbody>${rows}</tbody>
         </table>
+        ${reactionRows ? `
+        <h3 style="margin-top:1.25rem;margin-bottom:0.5rem;font-size:0.95rem;opacity:0.8;">Reactions emoji</h3>
+        <table class="dash-table">
+            <thead><tr><th>Personne</th><th>Emises (ton moyen)</th><th>Recues (ton moyen)</th></tr></thead>
+            <tbody>${reactionRows}</tbody>
+        </table>` : ''}
+        ${afterRows ? `
+        <h3 style="margin-top:1.25rem;margin-bottom:0.5rem;font-size:0.95rem;opacity:0.8;">Influence sur l'ambiance</h3>
+        <table class="dash-table">
+            <thead><tr><th>Apres ses messages</th><th>Ambiance des reponses</th><th></th></tr></thead>
+            <tbody>${afterRows}</tbody>
+        </table>` : ''}
     </section>`;
 }
 
