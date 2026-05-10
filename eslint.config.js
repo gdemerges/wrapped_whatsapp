@@ -23,6 +23,10 @@ export default [
                 JSZip: 'readonly',
                 LZString: 'readonly',
                 process: 'readonly',
+                performance: 'readonly',
+                indexedDB: 'readonly',
+                crypto: 'readonly',
+                TextEncoder: 'readonly',
             },
         },
         rules: {

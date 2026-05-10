@@ -2,8 +2,9 @@
  * Main app — file upload, worker orchestration, navigation, rendering.
  */
 
-import { generateSlides } from './slides.js';
+import { generateSlides } from './slides/index.js';
 import { serializeStats, rehydrateDates, buildShareURL } from './payload.js';
+import { hashFile, getCached, setCached } from './cache.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -166,9 +167,18 @@ async function handleFile(file) {
         }
         currentYear = selectedYear;
 
-        loadingStatus.textContent = 'Calcul des stats...';
-        const result = await callWorker(text, selectedYear);
-        if (result.kind !== 'stats') throw new Error('Calcul echoue');
+        const cacheKey = await hashFile(text + '|y=' + selectedYear);
+        const cached = await getCached(cacheKey);
+        let result;
+        if (cached) {
+            loadingStatus.textContent = 'Restauration depuis le cache...';
+            result = { kind: 'stats', stats: cached.stats, comparison: cached.comparison };
+        } else {
+            loadingStatus.textContent = 'Calcul des stats...';
+            result = await callWorker(text, selectedYear);
+            if (result.kind !== 'stats') throw new Error('Calcul echoue');
+            setCached(cacheKey, { stats: result.stats, comparison: result.comparison, year: selectedYear });
+        }
 
         currentStats = rehydrateDates(result.stats);
         currentComparison = result.comparison;

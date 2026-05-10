@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "strictNullChecks": true,
+    "noImplicitThis": true,
+    "noImplicitReturns": true,
+    "skipLibCheck": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "types": []
+  },
+  "include": [
+    "js/parser.js",
+    "js/stats.js",
+    "js/utils.js",
+    "js/payload.js",
+    "js/types.d.ts"
+  ],
+  "exclude": ["node_modules", "tests"]
+}

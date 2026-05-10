@@ -13,13 +13,17 @@ const URL_TEST_RE = /https?:\/\/\S+/;
 const HTML_STRIP_RE = /<[^>]+>/g;
 const GHOST_THRESHOLD_MIN = 60 * 24; // 24h = ghosted
 
+/**
+ * @param {import('./types.d.ts').Message[]} messages
+ * @returns {import('./types.d.ts').Stats}
+ */
 export function compute(messages) {
     if (!messages || messages.length === 0) {
         throw new Error('Aucun message à analyser');
     }
 
     // Ensure chronological order
-    messages = [...messages].sort((a, b) => a.datetime - b.datetime);
+    messages = [...messages].sort((a, b) => a.datetime.getTime() - b.datetime.getTime());
 
     const stats = initAccumulators();
 
@@ -118,7 +122,7 @@ export function compute(messages) {
 
         // --- Response time & ghosting ---
         if (prev) {
-            const diffMin = (dt - prev.datetime) / 60000;
+            const diffMin = (dt.getTime() - prev.datetime.getTime()) / 60000;
             if (prev.author !== author && diffMin > 0) {
                 if (diffMin < 1440) {
                     person.responseTimes.push(diffMin);
@@ -153,7 +157,7 @@ export function compute(messages) {
 }
 
 function initAccumulators() {
-    return {
+    return /** @type {any} */ ({
         totalMessages: 0,
         totalChars: 0,
         textCount: 0,
@@ -177,7 +181,7 @@ function initAccumulators() {
         ghosts: [],
         initiator: {},
         firstMessage: null,
-    };
+    });
 }
 
 function newPerson() {
@@ -210,7 +214,7 @@ function finalize(acc, messages) {
     // messages are sorted chronologically in compute()
     const startDate = new Date(messages[0].datetime);
     const endDate = new Date(messages[messages.length - 1].datetime);
-    const totalDays = Math.ceil((endDate - startDate) / 86400000) + 1;
+    const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
 
     // Per-person derived metrics
     const perPerson = {};
@@ -388,7 +392,7 @@ function computeStreak(daily) {
     for (let i = 1; i < dates.length; i++) {
         const prev = new Date(dates[i - 1]);
         const curr = new Date(dates[i]);
-        const diff = Math.round((curr - prev) / 86400000);
+        const diff = Math.round((curr.getTime() - prev.getTime()) / 86400000);
         if (diff === 1) { cur++; maxStreak = Math.max(maxStreak, cur); }
         else cur = 1;
     }
@@ -441,16 +445,35 @@ function computeCompatibility(perPerson, ranking, acc) {
 /**
  * Compare two stats objects (year N vs N-1).
  * Returns deltas for a handful of key metrics.
+ * @param {import('./types.d.ts').Stats | null} current
+ * @param {import('./types.d.ts').Stats | null} previous
+ * @returns {import('./types.d.ts').YearComparison | null}
  */
 export function compareYears(current, previous) {
     if (!current || !previous) return null;
     const pct = (a, b) => b === 0 ? null : Math.round(((a - b) / b) * 100);
+
+    // Words that appeared / disappeared between the two top-30 lists.
+    const curWords = new Map(current.topWords || []);
+    const prevWords = new Map(previous.topWords || []);
+    const appeared = [...curWords.entries()]
+        .filter(([w]) => !prevWords.has(w))
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6);
+    const disappeared = [...prevWords.entries()]
+        .filter(([w]) => !curWords.has(w))
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6);
+
     return {
         messages: { current: current.totalMessages, previous: previous.totalMessages, pct: pct(current.totalMessages, previous.totalMessages) },
         days: { current: current.totalDays, previous: previous.totalDays },
         avgPerDay: { current: +current.avgPerDay, previous: +previous.avgPerDay, pct: pct(+current.avgPerDay, +previous.avgPerDay) },
         emojis: { current: current.emojis.total, previous: previous.emojis.total, pct: pct(current.emojis.total, previous.emojis.total) },
         media: { current: current.totalMedia, previous: previous.totalMedia, pct: pct(current.totalMedia, previous.totalMedia) },
-        streak: { current: current.streak.max, previous: previous.streak.max },
+        avgMsgLen: { current: current.avgMsgLen, previous: previous.avgMsgLen, pct: pct(current.avgMsgLen, previous.avgMsgLen) },
+        streak: { current: current.streak.max, previous: previous.streak.max, pct: pct(current.streak.max, previous.streak.max) },
+        appeared,
+        disappeared,
     };
 }

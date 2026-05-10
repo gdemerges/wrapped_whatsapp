@@ -97,7 +97,9 @@ export function cleanLine(line) {
 /**
  * Parse chat text into structured messages.
  * @param {string} text
- * @param {{ year?: number }} options
+ * @param {string} text
+ * @param {{ year?: number }} [options]
+ * @returns {import('./types.d.ts').Message[]}
  */
 export function parse(text, options = {}) {
     const lines = text.split('\n').map(cleanLine);
@@ -107,7 +109,9 @@ export function parse(text, options = {}) {
         throw new Error("Format de fichier non reconnu. Assurez-vous d'exporter la conversation depuis WhatsApp.");
     }
 
+    /** @type {any[]} */
     const records = [];
+    /** @type {any} */
     let current = null;
 
     for (const line of lines) {
