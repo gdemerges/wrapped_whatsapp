@@ -6,7 +6,8 @@
 
 const DB_NAME = 'wa-wrapped';
 const STORE = 'stats';
-const DB_VERSION = 1;
+// v2: reactions are no longer counted as messages — drop pre-fix cached stats.
+const DB_VERSION = 2;
 const TTL_DAYS = 14;
 
 /** Opens (and migrates) the database. */
@@ -15,9 +16,10 @@ function openDB() {
         const req = indexedDB.open(DB_NAME, DB_VERSION);
         req.onupgradeneeded = () => {
             const db = req.result;
-            if (!db.objectStoreNames.contains(STORE)) {
-                db.createObjectStore(STORE, { keyPath: 'key' });
-            }
+            // Recreate the store on any version bump so stale (pre-fix)
+            // stats are recomputed rather than served from cache.
+            if (db.objectStoreNames.contains(STORE)) db.deleteObjectStore(STORE);
+            db.createObjectStore(STORE, { keyPath: 'key' });
         };
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
