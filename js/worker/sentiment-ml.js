@@ -211,14 +211,6 @@ export async function computeSentimentML(messages, lang, onProgress) {
         return buildResult(allAuthors, categorical, {}, reactionStats, agg.finalize(), { mlEnabled: false, device, error: String(err) });
     }
 
-    try {
-        const probe = await sentClassifier('je suis tres heureux', { top_k: 3 });
-        console.log('[sentiment] probe output:', JSON.stringify(probe));
-        console.log('[sentiment] probe polarity:', polarityFromScores(probe));
-    } catch (err) {
-        console.error('[sentiment] probe inference failed:', err);
-    }
-
     let ironyClassifier = null;
     if (lang === 'en') ironyClassifier = await loadIrony(device, onProgress);
 
@@ -283,7 +275,6 @@ export async function computeSentimentML(messages, lang, onProgress) {
             mean, stdDev,
             intensity: count > 0 ? sumAbs / count : 0,
         };
-        console.log(`[sentiment] ${author}: ${count} samples, pos=${pos.toFixed(2)}, neg=${neg.toFixed(2)}, mean=${mean.toFixed(2)}, stdDev=${stdDev.toFixed(2)}`);
     }
 
     return buildResult(allAuthors, categorical, polarity, reactionStats, agg.finalize(),
