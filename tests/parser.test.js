@@ -49,6 +49,31 @@ describe('parser', () => {
         expect(() => parse('just some random text\nwith no structure')).toThrow(/Format/);
     });
 
+    it('parses Android US format (M/D/YY, h:mm AM/PM)', () => {
+        const messages = parse(fixture('android_us.txt'));
+        expect(messages.length).toBe(4);
+        expect(messages[0].author).toBe('Alice');
+        const d = messages[0].datetime;
+        expect(d.getFullYear()).toBe(2024);
+        expect(d.getMonth()).toBe(2); // March
+        expect(d.getDate()).toBe(15);
+        expect(d.getHours()).toBe(14); // 2:30 PM
+        expect(messages[2].datetime.getHours()).toBe(23); // 11:45 PM
+        expect(messages[3].datetime.getHours()).toBe(7);  // 7:15 AM
+    });
+
+    it('throws instead of silently dropping when no date can be parsed', () => {
+        // MM/DD/YYYY dates whose day>12 are invalid under the detected DD/MM format.
+        // Previously these were silently filtered out, returning an empty result.
+        const text = [
+            '[03/25/2024 10:00:00] Alice: one',
+            '[03/26/2024 10:01:00] Bob: two',
+            '[03/27/2024 10:02:00] Alice: three',
+            '[03/28/2024 10:03:00] Bob: four',
+        ].join('\n');
+        expect(() => parse(text)).toThrow(/date/i);
+    });
+
     it('handles Left-To-Right marks in iOS exports', () => {
         const line = '\u200e[12/03/2024 14:30:00] Alice: \u200emessage';
         expect(cleanLine(line)).toBe('[12/03/2024 14:30:00] Alice: \u200emessage');

@@ -133,6 +133,13 @@ export function parse(text, options = {}) {
 
     let validRecords = records.filter(r => !isNaN(r.datetime.getTime()));
 
+    // Guard against a locale/format mismatch (e.g. MM/DD vs DD/MM): if lines
+    // matched the layout but none yielded a valid date, fail loudly instead of
+    // silently returning an empty result.
+    if (records.length > 0 && validRecords.length === 0) {
+        throw new Error("Les dates du fichier n'ont pas pu être interprétées (format de date non reconnu).");
+    }
+
     if (options.year) {
         validRecords = validRecords.filter(r => r.datetime.getFullYear() === options.year);
     }
