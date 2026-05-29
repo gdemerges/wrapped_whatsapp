@@ -15,7 +15,7 @@ describe('stats.compute', () => {
     const stats = compute(messages);
 
     it('computes basic counts', () => {
-        expect(stats.totalMessages).toBe(messages.length);
+        expect(stats.totalMessages).toBe(messages.filter(m => !m.isReaction).length);
         expect(stats.participants).toBe(2);
     });
 
@@ -63,6 +63,34 @@ describe('stats.compute', () => {
     it('computes unique vocabulary with floor=3', () => {
         // With short fixture no word hits floor=3, but shape should be valid
         expect(typeof stats.uniqueWordsPerPerson).toBe('object');
+    });
+});
+
+describe('reactions are excluded from message-level stats', () => {
+    const text = [
+        '[01/01/2024 10:00:00] Alice: salut comment vas tu aujourdhui',
+        '[01/01/2024 10:01:00] Bob: a réagi ❤️ à "salut comment vas tu"',
+        '[01/01/2024 10:02:00] Bob: tres bien merci beaucoup',
+    ].join('\n');
+    const messages = parse(text);
+    const stats = compute(messages);
+
+    it('does not count reactions as messages', () => {
+        expect(messages.filter(m => m.isReaction).length).toBe(1);
+        expect(stats.totalMessages).toBe(2);
+    });
+
+    it('does not leak reaction-body words into word frequency', () => {
+        const words = Object.fromEntries(stats.topWords);
+        // "réagi" only ever appears in the reaction line
+        expect(words['réagi']).toBeUndefined();
+    });
+
+    it('does not double-count reaction emojis as message emojis', () => {
+        expect(stats.reactions.total).toBe(1);
+        // ❤️ belongs to the reaction tally, not the general emoji stats
+        expect(stats.emojis.top.find(([e]) => e === '❤️')).toBeUndefined();
+        expect(stats.emojis.total).toBe(0);
     });
 });
 

@@ -38,6 +38,19 @@ export function compute(messages) {
 
     for (const m of messages) {
         const author = m.author;
+
+        // --- Reactions: tallied separately, never counted as messages ---
+        // A reaction line ("a réagi ❤️ à …") is not a message: counting it
+        // would inflate totals, pollute word frequencies with the reaction
+        // body, and double-count its emoji against the general emoji stats.
+        if (m.isReaction) {
+            stats.reactions.total++;
+            stats.reactions.perAuthor[author] = (stats.reactions.perAuthor[author] || 0) + 1;
+            const e = m.reactionEmoji;
+            if (e) stats.reactions.perEmoji[e] = (stats.reactions.perEmoji[e] || 0) + 1;
+            continue;
+        }
+
         const person = stats.perPerson[author] ||= newPerson();
 
         // --- Counts & lengths ---
@@ -79,14 +92,6 @@ export function compute(messages) {
         if (m.isEdited) { stats.totalEdited++; person.edited++; }
 
         if (URL_TEST_RE.test(m.message)) { stats.totalLinks++; person.links++; }
-
-        // --- Reactions ---
-        if (m.isReaction) {
-            stats.reactions.total++;
-            stats.reactions.perAuthor[author] = (stats.reactions.perAuthor[author] || 0) + 1;
-            const e = m.reactionEmoji;
-            if (e) stats.reactions.perEmoji[e] = (stats.reactions.perEmoji[e] || 0) + 1;
-        }
 
         // --- Emojis ---
         const emojis = m.message.match(EMOJI_RE) || [];
