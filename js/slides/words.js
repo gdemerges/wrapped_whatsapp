@@ -14,7 +14,7 @@ export function topWordsSlide(stats, gradient) {
         html: `
             <div class="slide-inner">
                 <span class="slide-tag">Vocabulaire</span>
-                <h2 class="slide-title">Les mots les plus utilises</h2>
+                <h2 class="slide-title">Les mots les plus utilisés</h2>
                 <div class="words-cloud">${wordTags}</div>
             </div>
         `,
@@ -35,7 +35,7 @@ export function uniqueWordsSlide(stats, gradient) {
             <div class="slide-inner">
                 <span class="slide-tag">Signature</span>
                 <h2 class="slide-title">Les mots de chacun</h2>
-                <p class="slide-subtitle">Mots utilises uniquement par une seule personne</p>
+                <p class="slide-subtitle">Mots utilisés uniquement par une seule personne</p>
                 <div class="uniq-grid">${blocks}</div>
             </div>
         `,

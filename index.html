@@ -7,9 +7,21 @@
     <meta name="referrer" content="no-referrer">
     <title>WhatsApp Wrapped</title>
     <meta name="description" content="Analyse tes conversations WhatsApp et génère une présentation animée, 100% dans ton navigateur.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="WhatsApp Wrapped">
+    <meta property="og:description" content="Analyse tes conversations WhatsApp et génère une présentation animée, 100% dans ton navigateur.">
+    <meta property="og:image" content="favicon.svg">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="WhatsApp Wrapped">
+    <meta name="twitter:description" content="Analyse tes conversations WhatsApp et génère une présentation animée, 100% dans ton navigateur.">
+    <meta name="twitter:image" content="favicon.svg">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://huggingface.co" crossorigin>
     <link rel="stylesheet" href="css/style.css?v=2">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js" integrity="sha384-0d+Gr7vM4Drod8E3hXKgciWJSWbjD/opKLLygI9ktiWbuvlDwQLzU46wJ9s5gsp7" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js" integrity="sha384-0d+Gr7vM4Drod8E3hXKgciWJSWbjD/opKLLygI9ktiWbuvlDwQLzU46wJ9s5gsp7" crossorigin="anonymous"></script>
 </head>
 <body>
     <button id="theme-toggle" class="theme-toggle" aria-label="Changer le thème" title="Changer le thème">
@@ -29,7 +41,7 @@
                 </div>
                 <h1 class="logo-title">WhatsApp<br><span>Wrapped</span></h1>
             </div>
-            <p class="upload-subtitle">Decouvre les stats cachees de tes conversations</p>
+            <p class="upload-subtitle">Découvre les stats cachées de tes conversations</p>
 
             <div class="how-to">
                 <h3>Comment exporter ta conversation ?</h3>
@@ -37,7 +49,7 @@
                     <div class="step"><div class="step-number" aria-hidden="true">1</div><p>Ouvre la conversation WhatsApp</p></div>
                     <div class="step"><div class="step-number" aria-hidden="true">2</div><p>Appuie sur le nom du groupe/contact en haut</p></div>
                     <div class="step"><div class="step-number" aria-hidden="true">3</div><p>Descends et appuie sur <strong>"Exporter la discussion"</strong></p></div>
-                    <div class="step"><div class="step-number" aria-hidden="true">4</div><p>Choisis <strong>"Sans medias"</strong>, puis importe le fichier ici — le <strong>.zip</strong> marche directement, pas besoin de le decompresser</p></div>
+                    <div class="step"><div class="step-number" aria-hidden="true">4</div><p>Choisis <strong>"Sans médias"</strong>, puis importe le fichier ici — le <strong>.zip</strong> marche directement, pas besoin de le décompresser</p></div>
                 </div>
             </div>
 
@@ -50,7 +62,7 @@
                     <input type="file" id="file-input" accept=".txt,.zip" hidden>
                 </label>
             </div>
-            <p class="privacy-note">Tes donnees restent sur ton appareil. Rien n'est envoye a un serveur.</p>
+            <p class="privacy-note">Tes données restent sur ton appareil. Rien n'est envoyé à un serveur.</p>
         </div>
     </div>
 
@@ -68,13 +80,13 @@
         <div class="slides-container" id="slides-container"></div>
         <div class="slide-counter" id="slide-counter" aria-hidden="true"></div>
         <div class="nav-dots" id="nav-dots" role="tablist" aria-label="Navigation entre les slides"></div>
-        <button class="nav-arrow nav-prev" id="nav-prev" aria-label="Slide precedente">&larr;</button>
+        <button class="nav-arrow nav-prev" id="nav-prev" aria-label="Slide précédente">&larr;</button>
         <button class="nav-arrow nav-next" id="nav-next" aria-label="Slide suivante">&rarr;</button>
-        <div class="swipe-hint" id="swipe-hint" aria-hidden="true">Swipe ou utilise les fleches &rarr;</div>
+        <div class="swipe-hint" id="swipe-hint" aria-hidden="true">Swipe ou utilise les flèches &rarr;</div>
         <button class="summary-btn" id="summary-btn" aria-label="Voir le dashboard complet">Dashboard</button>
     </div>
 
-<div class="share-toast" id="share-toast" role="status">Lien copie !</div>
+<div class="share-toast" id="share-toast" role="status">Lien copié !</div>
 
     <!-- Screen-reader announcements -->
     <div id="a11y-live" class="sr-only" aria-live="polite" aria-atomic="true"></div>

@@ -13,7 +13,7 @@ export function overviewSlide(stats, gradient) {
                     <div class="stat-card"><div class="stat-value">${stats.participants}</div><div class="stat-label">participants</div></div>
                     <div class="stat-card"><div class="stat-value">${stats.totalDays}</div><div class="stat-label">jours</div></div>
                     <div class="stat-card"><div class="stat-value">${stats.avgPerDay}</div><div class="stat-label">messages / jour</div></div>
-                    <div class="stat-card"><div class="stat-value">${fmt(stats.totalChars)}</div><div class="stat-label">caracteres</div></div>
+                    <div class="stat-card"><div class="stat-value">${fmt(stats.totalChars)}</div><div class="stat-label">caractères</div></div>
                 </div>
             </div>
         `,
@@ -34,9 +34,9 @@ export function comparisonSlide(comparison, gradient) {
         html: `
             <div class="slide-inner">
                 <span class="slide-tag">Comparaison</span>
-                <h2 class="slide-title">Cette annee vs l'annee derniere</h2>
+                <h2 class="slide-title">Cette année vs l'année dernière</h2>
                 <table class="compare-table">
-                    <thead><tr><th></th><th>Avant</th><th>Maintenant</th><th>Evolution</th></tr></thead>
+                    <thead><tr><th></th><th>Avant</th><th>Maintenant</th><th>Évolution</th></tr></thead>
                     <tbody>
                         ${row('Messages', comparison.messages)}
                         ${row('Par jour', comparison.avgPerDay)}
@@ -65,7 +65,7 @@ export function wordsTrendSlide(comparison, gradient) {
         html: `
             <div class="slide-inner">
                 <span class="slide-tag">Vocabulaire</span>
-                <h2 class="slide-title">Les mots de l'annee</h2>
+                <h2 class="slide-title">Les mots de l'année</h2>
                 ${appeared.length ? `<p style="color:var(--text-muted);font-size:0.85rem;margin-top:1rem;">Nouveaux mots ✨</p><div class="words-cloud">${newCloud}</div>` : ''}
                 ${disappeared.length ? `<p style="color:var(--text-muted);font-size:0.85rem;margin-top:1rem;">Disparus de votre top</p><div class="words-cloud">${oldCloud}</div>` : ''}
             </div>
@@ -85,7 +85,7 @@ export function recapSlide(stats) {
                     <div class="stat-card"><div class="stat-value">${stats.participants}</div><div class="stat-label">participants</div></div>
                     <div class="stat-card"><div class="stat-value">${stats.totalDays}</div><div class="stat-label">jours</div></div>
                     <div class="stat-card"><div class="stat-value">${fmt(stats.emojis.total)}</div><div class="stat-label">emojis</div></div>
-                    <div class="stat-card"><div class="stat-value">${fmt(stats.totalMedia)}</div><div class="stat-label">medias</div></div>
+                    <div class="stat-card"><div class="stat-value">${fmt(stats.totalMedia)}</div><div class="stat-label">médias</div></div>
                     <div class="stat-card"><div class="stat-value">${stats.streak.max}j</div><div class="stat-label">meilleur streak</div></div>
                 </div>
                 <p class="slide-subtitle" style="margin-top:1.5rem;">

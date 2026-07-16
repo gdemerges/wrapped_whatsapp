@@ -46,7 +46,7 @@ export function duoBoardSlide(stats, gradient) {
                         ${cell(`${pA.avgLen}`, 'car. / msg')}
                         ${cell(rtA != null ? fmtTime(rtA) : '—', 'temps de réponse')}
                         ${cell(fmt(pA.emojis), 'emojis')}
-                        ${cell(fmt(pA.media), 'medias')}
+                        ${cell(fmt(pA.media), 'médias')}
                         ${sigA ? cell(escapeHtml(sigA[0]), 'son mot signature') : ''}
                     </div>
                     <div class="duo-vs">
@@ -65,7 +65,7 @@ export function duoBoardSlide(stats, gradient) {
                         ${cell(`${pB.avgLen}`, 'car. / msg')}
                         ${cell(rtB != null ? fmtTime(rtB) : '—', 'temps de réponse')}
                         ${cell(fmt(pB.emojis), 'emojis')}
-                        ${cell(fmt(pB.media), 'medias')}
+                        ${cell(fmt(pB.media), 'médias')}
                         ${sigB ? cell(escapeHtml(sigB[0]), 'son mot signature') : ''}
                     </div>
                 </div>
@@ -99,7 +99,7 @@ export function duoWordsSlide(stats, gradient) {
             <div class="slide-inner">
                 <span class="slide-tag">Signature</span>
                 <h2 class="slide-title">Le vocabulaire de chacun</h2>
-                <p class="slide-subtitle">Mots utilises uniquement par cette personne</p>
+                <p class="slide-subtitle">Mots utilisés uniquement par cette personne</p>
                 <div class="duo-words">
                     <div class="duo-words-col">
                         <h4 style="color:${colorA};">${escapeHtml(nameA)}</h4>

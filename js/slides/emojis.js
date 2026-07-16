@@ -11,8 +11,8 @@ export function emojiSlide(stats, gradient) {
             <div class="slide-inner">
                 <span class="slide-tag">Emojis</span>
                 <div class="big-number">${fmt(stats.emojis.total)}</div>
-                <div class="big-label">emojis envoyes</div>
-                <p class="slide-subtitle">${stats.emojis.unique} emojis differents utilises</p>
+                <div class="big-label">emojis envoyés</div>
+                <p class="slide-subtitle">${stats.emojis.unique} emojis différents utilisés</p>
                 <div class="emoji-grid">${items}</div>
             </div>
         `,
@@ -25,7 +25,7 @@ export function reactionsSlide(stats, gradient) {
         `<div class="emoji-item"><span class="emoji">${escapeHtml(e)}</span><span class="emoji-count">${fmt(n)}</span></div>`
     ).join('');
     const reacters = stats.reactions.perAuthor.slice(0, 5).map(([name, n]) =>
-        `<li><strong>${escapeHtml(name)}</strong> — ${fmt(n)} reactions</li>`
+        `<li><strong>${escapeHtml(name)}</strong> — ${fmt(n)} réactions</li>`
     ).join('');
     return {
         gradient,
@@ -33,7 +33,7 @@ export function reactionsSlide(stats, gradient) {
             <div class="slide-inner">
                 <span class="slide-tag">Reactions</span>
                 <div class="big-number">${fmt(stats.reactions.total)}</div>
-                <div class="big-label">reactions envoyees</div>
+                <div class="big-label">réactions envoyées</div>
                 <div class="emoji-grid">${top}</div>
                 <ul class="plain-list">${reacters}</ul>
             </div>

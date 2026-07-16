@@ -16,7 +16,7 @@ export function mediaSlide(stats, gradient) {
             <div class="slide-inner">
                 <span class="slide-tag">Medias</span>
                 <div class="big-number">${fmt(totalMedia)}</div>
-                <div class="big-label">medias et liens partages</div>
+                <div class="big-label">médias et liens partagés</div>
                 <div class="stat-grid">${cards}</div>
             </div>
         `,

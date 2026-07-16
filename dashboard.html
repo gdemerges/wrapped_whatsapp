@@ -6,10 +6,21 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'">
     <meta name="referrer" content="no-referrer">
     <title>Dashboard · WhatsApp Wrapped</title>
+    <meta name="description" content="Dashboard complet des statistiques de ta conversation WhatsApp, 100% dans ton navigateur.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Dashboard · WhatsApp Wrapped">
+    <meta property="og:description" content="Dashboard complet des statistiques de ta conversation WhatsApp, 100% dans ton navigateur.">
+    <meta property="og:image" content="favicon.svg">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Dashboard · WhatsApp Wrapped">
+    <meta name="twitter:image" content="favicon.svg">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="stylesheet" href="css/style.css?v=2">
     <link rel="stylesheet" href="css/dashboard.css?v=2">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js" integrity="sha384-0d+Gr7vM4Drod8E3hXKgciWJSWbjD/opKLLygI9ktiWbuvlDwQLzU46wJ9s5gsp7" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js" integrity="sha384-0d+Gr7vM4Drod8E3hXKgciWJSWbjD/opKLLygI9ktiWbuvlDwQLzU46wJ9s5gsp7" crossorigin="anonymous"></script>
 </head>
 <body class="dashboard-body">
     <button id="theme-toggle" class="theme-toggle" aria-label="Changer le thème" title="Changer le thème">
@@ -31,12 +42,12 @@
 
     <main id="dash-content" class="dash-content" aria-live="polite">
         <div class="dash-empty">
-            <p>Aucune donnee a afficher.</p>
+            <p>Aucune donnée à afficher.</p>
             <a href="index.html" class="file-btn">Analyser une conversation</a>
         </div>
     </main>
 
-    <div class="share-toast" id="share-toast" role="status">Lien copie !</div>
+    <div class="share-toast" id="share-toast" role="status">Lien copié !</div>
     <div id="a11y-live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
     <script type="module" src="js/dashboard.js"></script>

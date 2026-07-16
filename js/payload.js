@@ -58,9 +58,31 @@ export function sanitizeShared(value) {
     return value;
 }
 
+// Conservative bound: some messaging apps / older clients mangle or clip
+// URLs well before typical browser limits. Fields are dropped heaviest-first
+// until the compressed link fits, or there's nothing left to trim.
+const SHARE_URL_SAFE_LENGTH = 6000;
+const TRIMMABLE_FIELDS = ['monthlyPerPerson', 'topWordsPerPerson', 'uniqueWordsPerPerson', 'monthly', 'topWords', 'heatmap'];
+
+/**
+ * @returns {{ url: string, truncated: boolean }}
+ */
 export function buildShareURL(stats, comparison, opts = {}) {
     const s = serializeStats(stats);
     if (opts.dropDaily) delete s.daily;
-    const compressed = LZString.compressToEncodedURIComponent(JSON.stringify({ s, c: comparison }));
-    return window.location.origin + window.location.pathname + '#share=' + compressed;
+
+    const build = () => window.location.origin + window.location.pathname
+        + '#share=' + LZString.compressToEncodedURIComponent(JSON.stringify({ s, c: comparison }));
+
+    let url = build();
+    let truncated = false;
+    for (const field of TRIMMABLE_FIELDS) {
+        if (url.length <= SHARE_URL_SAFE_LENGTH) break;
+        if (!(field in s)) continue;
+        delete s[field];
+        truncated = true;
+        url = build();
+    }
+
+    return { url, truncated };
 }

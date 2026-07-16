@@ -52,7 +52,7 @@ export function heatmapSlide(stats, gradient) {
             <div class="slide-inner">
                 <span class="slide-tag">Patterns</span>
                 <h2 class="slide-title">Quand discutez-vous ?</h2>
-                <p class="slide-subtitle">Heure de pointe : <strong>${stats.peakHour}h</strong> | Jour prefere : <strong>${stats.peakDay}</strong></p>
+                <p class="slide-subtitle">Heure de pointe : <strong>${stats.peakHour}h</strong> | Jour préféré : <strong>${stats.peakDay}</strong></p>
                 <div class="heatmap-container"><div class="heatmap-grid">${heatCells.join('')}</div></div>
             </div>
         `,

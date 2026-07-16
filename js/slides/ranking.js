@@ -22,7 +22,7 @@ export function pieSlide(stats, gradient) {
         gradient,
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Repartition</span>
+                <span class="slide-tag">Répartition</span>
                 <h2 class="slide-title">Qui parle le plus ?</h2>
                 <div class="chart-wrapper" style="max-width:350px;margin:1.5rem auto;">
                     <canvas id="chart-pie" height="350"></canvas>
@@ -59,7 +59,7 @@ export function evolutionPerPersonSlide(stats, gradient) {
         gradient,
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Evolution</span>
+                <span class="slide-tag">Évolution</span>
                 <h2 class="slide-title">Qui parle quand ?</h2>
                 <div class="filter-bar" id="evolution-filters">${filterBtns}</div>
                 <div class="chart-wrapper"><canvas id="chart-evolution" height="300"></canvas></div>
@@ -123,7 +123,7 @@ export function messageLengthSlide(stats, gradient) {
             <div class="slide-inner">
                 <span class="slide-tag">Longueur</span>
                 <h2 class="slide-title">Qui ecrit les plus longs messages ?</h2>
-                <p class="slide-subtitle">Longueur moyenne par message (en caracteres)</p>
+                <p class="slide-subtitle">Longueur moyenne par message (en caractères)</p>
                 <div class="ranking-list">${rankingBars(avgLenRanking, r => r[1].avgLen, r => `${r[1].avgLen} car.`, maxAvgLen)}</div>
             </div>
         `,
@@ -154,7 +154,7 @@ export function initiatorSlide(stats, gradient) {
             <div class="slide-inner">
                 <span class="slide-tag">Initiative</span>
                 <h2 class="slide-title">Qui lance la conversation ?</h2>
-                <p class="slide-subtitle">Nombre de jours ou cette personne a envoye le premier message</p>
+                <p class="slide-subtitle">Nombre de jours ou cette personne a envoyé le premier message</p>
                 <div class="ranking-list">${bars}</div>
             </div>
         `,

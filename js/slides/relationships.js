@@ -32,7 +32,7 @@ export function compatibilitySlide(stats, gradient) {
         gradient,
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Compatibilite</span>
+                <span class="slide-tag">Compatibilité</span>
                 <div class="big-number">${c.score}<span style="font-size:2rem;opacity:0.7;">/100</span></div>
                 <div class="big-label">score de compatibilite</div>
                 <div class="stat-grid">
@@ -49,8 +49,8 @@ export function compatibilitySlide(stats, gradient) {
 export function funFactsSlide(stats, gradient) {
     const facts = [];
     facts.push({ icon: '📅', text: `Le jour le plus actif etait le <strong>${new Date(stats.mostActiveDay[0]).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</strong> avec <strong>${stats.mostActiveDay[1]} messages</strong> !` });
-    if (stats.streak.max > 1) facts.push({ icon: '🔥', text: `Record de conversation : <strong>${stats.streak.max} jours consecutifs</strong> sans interruption !` });
-    if (stats.longestMessage && stats.longestMessage.msgLen > 0) facts.push({ icon: '📝', text: `Le plus long message (<strong>${fmt(stats.longestMessage.msgLen)} caracteres</strong>) par <strong>${escapeHtml(stats.longestMessage.author)}</strong>` });
+    if (stats.streak.max > 1) facts.push({ icon: '🔥', text: `Record de conversation : <strong>${stats.streak.max} jours consécutifs</strong> sans interruption !` });
+    if (stats.longestMessage && stats.longestMessage.msgLen > 0) facts.push({ icon: '📝', text: `Le plus long message (<strong>${fmt(stats.longestMessage.msgLen)} caractères</strong>) par <strong>${escapeHtml(stats.longestMessage.author)}</strong>` });
     if (stats.nightOwl) facts.push({ icon: '🦉', text: `Couche-tard : <strong>${escapeHtml(stats.nightOwl[0])}</strong> (${stats.nightOwl[1]} msgs entre 0h-5h)` });
     if (stats.earlyBird) facts.push({ icon: '🐦', text: `Leve-tot : <strong>${escapeHtml(stats.earlyBird[0])}</strong> (${stats.earlyBird[1]} msgs entre 5h-8h)` });
     if (stats.responseStats?.fastest) facts.push({ icon: '⚡', text: `Plus reactif : <strong>${escapeHtml(stats.responseStats.fastest[0])}</strong> (${fmtTime(stats.responseStats.fastest[1])})` });

@@ -29,6 +29,13 @@ let availableYears = [];
 let availableYearCounts = {};
 let currentYear = null;
 
+// ========== Service worker ==========
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch((err) => console.warn('[sw] registration failed:', err));
+    });
+}
+
 // ========== Theme ==========
 initTheme();
 
@@ -136,7 +143,7 @@ async function handleFile(file) {
     try {
         let text;
         if (file.name.endsWith('.zip')) {
-            loadingStatus.textContent = 'Decompression...';
+            loadingStatus.textContent = 'Décompression...';
             await loadJSZip();
             const zip = await JSZip.loadAsync(file);
             const txtFile = Object.values(zip.files).find(f => f.name.endsWith('.txt'));
@@ -149,7 +156,7 @@ async function handleFile(file) {
                 throw new Error(`Fichier décompressé trop volumineux (max ${Math.round(MAX_FILE_SIZE / 1024 / 1024)} Mo)`);
             }
             text = await txtFile.async('string', (meta) => {
-                loadingStatus.textContent = `Decompression... ${Math.round(meta.percent)}%`;
+                loadingStatus.textContent = `Décompression... ${Math.round(meta.percent)}%`;
             });
             if (text.length > MAX_FILE_SIZE) {
                 throw new Error(`Fichier décompressé trop volumineux (max ${Math.round(MAX_FILE_SIZE / 1024 / 1024)} Mo)`);
@@ -161,7 +168,7 @@ async function handleFile(file) {
 
         loadingStatus.textContent = 'Analyse des messages...';
         const yearsInfo = await callWorker(text);
-        if (yearsInfo.kind !== 'years') throw new Error('Reponse worker invalide');
+        if (yearsInfo.kind !== 'years') throw new Error('Réponse worker invalide');
 
         currentText = text;
         availableYears = yearsInfo.years;
@@ -186,19 +193,19 @@ async function handleFile(file) {
         } else {
             loadingStatus.textContent = 'Calcul des stats...';
             result = await callWorker(text, selectedYear);
-            if (result.kind !== 'stats') throw new Error('Calcul echoue');
+            if (result.kind !== 'stats') throw new Error('Calcul échoué');
             setCached(cacheKey, { stats: result.stats, comparison: result.comparison, year: selectedYear });
         }
 
         currentStats = rehydrateDates(result.stats);
         currentComparison = result.comparison;
 
-        loadingStatus.textContent = 'Generation du Wrapped...';
+        loadingStatus.textContent = 'Génération du Wrapped...';
         sessionStorage.removeItem('ww-stats'); // drop stats from a previous analysis
         const slides = generateSlides(currentStats, currentComparison);
         renderSlides(slides);
         showScreen(wrappedScreen);
-        announce(`${currentStats.totalMessages} messages analyses`);
+        announce(`${currentStats.totalMessages} messages analysés`);
     } catch (err) {
         console.error(err);
         showError(err.message);
@@ -222,14 +229,16 @@ function loadJSZip() {
 // ========== Year picker ==========
 function pickYear(years, yearCounts) {
     return new Promise((resolve) => {
+        const previouslyFocused = document.activeElement;
         const overlay = document.createElement('div');
         overlay.className = 'year-picker-overlay';
         overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
         overlay.setAttribute('aria-label', 'Choisir une année');
         overlay.innerHTML = `
             <div class="year-picker">
-                <h2>Quelle annee analyser ?</h2>
-                <p style="color:var(--text-muted);margin-bottom:1.5rem;font-size:0.9rem;">Plusieurs annees detectees</p>
+                <h2>Quelle année analyser ?</h2>
+                <p style="color:var(--text-muted);margin-bottom:1.5rem;font-size:0.9rem;">Plusieurs années détectées</p>
                 <div class="year-options">
                     ${years.map(y => `
                         <button class="year-btn" data-year="${y}">
@@ -237,18 +246,47 @@ function pickYear(years, yearCounts) {
                             <span class="year-count">${yearCounts[y].toLocaleString('fr-FR')} messages</span>
                         </button>`).join('')}
                     <button class="year-btn year-btn-all" data-year="all">
-                        <span class="year-value">Toutes les annees</span>
+                        <span class="year-value">Toutes les années</span>
                         <span class="year-count">${Object.values(yearCounts).reduce((a, b) => a + b, 0).toLocaleString('fr-FR')} messages</span>
                     </button>
                 </div>
             </div>`;
         document.body.appendChild(overlay);
         requestAnimationFrame(() => overlay.classList.add('active'));
+
+        const focusable = Array.from(overlay.querySelectorAll('.year-btn'));
+        focusable[0]?.focus();
+
+        function close(value) {
+            document.removeEventListener('keydown', onKeydown);
+            overlay.remove();
+            previouslyFocused?.focus?.();
+            resolve(value);
+        }
+
+        function onKeydown(e) {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                close(null); // default to "all years", the same as the explicit option
+            } else if (e.key === 'Tab' && focusable.length > 0) {
+                // Trap focus inside the dialog — there's nothing else to Tab to.
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
+        }
+        document.addEventListener('keydown', onKeydown);
+
         overlay.querySelectorAll('.year-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const raw = btn.dataset.year;
-                overlay.remove();
-                resolve(raw === 'all' ? null : parseInt(raw));
+                close(raw === 'all' ? null : parseInt(raw));
             });
         });
     });
@@ -321,7 +359,7 @@ function renderSlides(slides) {
             loadingStatus.textContent = 'Calcul des stats...';
             try {
                 const result = await callWorker(currentText, currentYear);
-                if (result.kind !== 'stats') throw new Error('Calcul echoue');
+                if (result.kind !== 'stats') throw new Error('Calcul échoué');
                 currentStats = rehydrateDates(result.stats);
                 currentComparison = result.comparison;
                 const newSlides = generateSlides(currentStats, currentComparison);
@@ -345,7 +383,8 @@ function renderSlides(slides) {
         shareBtn.textContent = 'Partager';
         shareBtn.addEventListener('click', () => {
             if (!currentStats) return;
-            copyToClipboard(buildShareURL(currentStats, currentComparison, { dropDaily: true }));
+            const { url, truncated } = buildShareURL(currentStats, currentComparison, { dropDaily: true });
+            copyToClipboard(url, truncated ? 'Lien copié (allégé, conversation volumineuse)' : 'Lien copié !');
         });
         analyserBtn.parentNode.insertBefore(shareBtn, analyserBtn);
     }
@@ -477,8 +516,8 @@ function showError(message) {
     setTimeout(() => toast.classList.remove('visible'), 4000);
 }
 
-function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(() => showToast('Lien copie !')).catch(() => {
+function copyToClipboard(text, message = 'Lien copié !') {
+    navigator.clipboard.writeText(text).then(() => showToast(message)).catch(() => {
         const ta = document.createElement('textarea');
         ta.value = text;
         ta.style.position = 'fixed';
@@ -487,7 +526,7 @@ function copyToClipboard(text) {
         ta.select();
         document.execCommand('copy');
         document.body.removeChild(ta);
-        showToast('Lien copie !');
+        showToast(message);
     });
 }
 
