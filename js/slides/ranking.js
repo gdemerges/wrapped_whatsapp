@@ -1,6 +1,6 @@
 import { escapeHtml, fmt } from '../utils.js';
 import { CHART_COLORS } from './_constants.js';
-import { rankingBars, monthLabels } from './_helpers.js';
+import { rankingBars, monthLabels, cssVar } from './_helpers.js';
 
 export function topMessagersSlide(stats, gradient) {
     const top10 = stats.ranking;
@@ -40,7 +40,7 @@ export function pieSlide(stats, gradient) {
                 data: { labels, datasets: [{ data, backgroundColor: CHART_COLORS.slice(0, labels.length), borderWidth: 2, borderColor: 'rgba(0,0,0,0.3)' }] },
                 options: {
                     responsive: true, maintainAspectRatio: true,
-                    plugins: { legend: { position: 'bottom', labels: { color: 'var(--text-primary)', padding: 12, font: { size: 11 } } } },
+                    plugins: { legend: { position: 'bottom', labels: { color: cssVar('--text-primary'), padding: 12, font: { size: 11 } } } },
                     cutout: '55%',
                 },
             });
@@ -92,10 +92,10 @@ export function evolutionPerPersonSlide(stats, gradient) {
                 data: { labels, datasets: makeDatasets('__all__') },
                 options: {
                     responsive: true, interaction: { mode: 'index', intersect: false },
-                    plugins: { legend: { display: true, position: 'bottom', labels: { color: 'var(--text-secondary)', padding: 8, font: { size: 9 }, boxWidth: 10 } } },
+                    plugins: { legend: { display: true, position: 'bottom', labels: { color: cssVar('--text-secondary'), padding: 8, font: { size: 9 }, boxWidth: 10 } } },
                     scales: {
-                        x: { ticks: { color: 'var(--text-muted)', font: { size: 9 } }, grid: { display: false } },
-                        y: { ticks: { color: 'var(--text-muted)' }, grid: { color: 'var(--grid-line)' }, beginAtZero: true },
+                        x: { ticks: { color: cssVar('--text-muted'), font: { size: 9 } }, grid: { display: false } },
+                        y: { ticks: { color: cssVar('--text-muted') }, grid: { color: cssVar('--grid-line') }, beginAtZero: true },
                     },
                 },
             });

@@ -1,6 +1,6 @@
 import { DAYS_FR } from '../utils.js';
 import { CHART_COLORS } from './_constants.js';
-import { monthLabels } from './_helpers.js';
+import { monthLabels, cssVar } from './_helpers.js';
 
 export function monthlySlide(stats, gradient) {
     return {
@@ -21,8 +21,8 @@ export function monthlySlide(stats, gradient) {
                 options: {
                     responsive: true, plugins: { legend: { display: false } },
                     scales: {
-                        x: { ticks: { color: 'var(--text-secondary)', maxRotation: 45, font: { size: 10 } }, grid: { display: false } },
-                        y: { ticks: { color: 'var(--text-secondary)' }, grid: { color: 'var(--grid-line)' } },
+                        x: { ticks: { color: cssVar('--text-secondary'), maxRotation: 45, font: { size: 10 } }, grid: { display: false } },
+                        y: { ticks: { color: cssVar('--text-secondary') }, grid: { color: cssVar('--grid-line') } },
                     },
                 },
             });
@@ -88,8 +88,8 @@ export function hourlyWeekdaySlide(stats, gradient) {
                 options: {
                     responsive: true, plugins: { legend: { display: false } },
                     scales: {
-                        x: { ticks: { color: 'var(--text-muted)', font: { size: 9 } }, grid: { display: false } },
-                        y: { ticks: { color: 'var(--text-muted)' }, grid: { color: 'var(--grid-line)' } },
+                        x: { ticks: { color: cssVar('--text-muted'), font: { size: 9 } }, grid: { display: false } },
+                        y: { ticks: { color: cssVar('--text-muted') }, grid: { color: cssVar('--grid-line') } },
                     },
                 },
             });
@@ -100,8 +100,8 @@ export function hourlyWeekdaySlide(stats, gradient) {
                 options: {
                     responsive: true, indexAxis: 'y', plugins: { legend: { display: false } },
                     scales: {
-                        x: { ticks: { color: 'var(--text-muted)' }, grid: { color: 'var(--grid-line)' } },
-                        y: { ticks: { color: 'var(--text-secondary)', font: { size: 11 } }, grid: { display: false } },
+                        x: { ticks: { color: cssVar('--text-muted') }, grid: { color: cssVar('--grid-line') } },
+                        y: { ticks: { color: cssVar('--text-secondary'), font: { size: 11 } }, grid: { display: false } },
                     },
                 },
             });

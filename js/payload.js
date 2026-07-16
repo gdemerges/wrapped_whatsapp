@@ -39,6 +39,25 @@ export function rehydrateDates(stats) {
     return stats;
 }
 
+/**
+ * Neutralize HTML in a payload received via a #share URL.
+ * That payload is attacker-controlled: fields the UI assumes numeric
+ * (avgPerDay, streak.max, percent…) are interpolated without escaping, so a
+ * forged link could inject markup. Stripping <, > and " from every string
+ * (keys included) closes element and attribute injection wholesale, without
+ * having to whitelist each field.
+ */
+export function sanitizeShared(value) {
+    if (typeof value === 'string') return value.replace(/[<>"]/g, '');
+    if (Array.isArray(value)) return value.map(sanitizeShared);
+    if (value && typeof value === 'object') {
+        const out = {};
+        for (const [k, v] of Object.entries(value)) out[sanitizeShared(k)] = sanitizeShared(v);
+        return out;
+    }
+    return value;
+}
+
 export function buildShareURL(stats, comparison, opts = {}) {
     const s = serializeStats(stats);
     if (opts.dropDaily) delete s.daily;

@@ -13,6 +13,7 @@ export default [
                 history: 'readonly',
                 location: 'readonly',
                 requestAnimationFrame: 'readonly',
+                getComputedStyle: 'readonly',
                 setTimeout: 'readonly',
                 clearTimeout: 'readonly',
                 alert: 'readonly',

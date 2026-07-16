@@ -3,7 +3,7 @@
  */
 
 import { generateSlides } from './slides/index.js';
-import { serializeStats, rehydrateDates, buildShareURL } from './payload.js';
+import { serializeStats, rehydrateDates, buildShareURL, sanitizeShared } from './payload.js';
 import { hashFile, getCached, setCached } from './cache.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -141,9 +141,19 @@ async function handleFile(file) {
             const zip = await JSZip.loadAsync(file);
             const txtFile = Object.values(zip.files).find(f => f.name.endsWith('.txt'));
             if (!txtFile) throw new Error('Aucun fichier .txt trouvé dans le ZIP');
+            // The 50 MB cap above applies to the *compressed* file; a small zip
+            // can inflate to gigabytes. Check the declared uncompressed size
+            // (internal JSZip field, may be absent) and re-check after inflate.
+            const declaredSize = txtFile._data?.uncompressedSize;
+            if (typeof declaredSize === 'number' && declaredSize > MAX_FILE_SIZE) {
+                throw new Error(`Fichier décompressé trop volumineux (max ${Math.round(MAX_FILE_SIZE / 1024 / 1024)} Mo)`);
+            }
             text = await txtFile.async('string', (meta) => {
                 loadingStatus.textContent = `Decompression... ${Math.round(meta.percent)}%`;
             });
+            if (text.length > MAX_FILE_SIZE) {
+                throw new Error(`Fichier décompressé trop volumineux (max ${Math.round(MAX_FILE_SIZE / 1024 / 1024)} Mo)`);
+            }
         } else {
             loadingStatus.textContent = 'Lecture du fichier...';
             text = await file.text();
@@ -184,6 +194,7 @@ async function handleFile(file) {
         currentComparison = result.comparison;
 
         loadingStatus.textContent = 'Generation du Wrapped...';
+        sessionStorage.removeItem('ww-stats'); // drop stats from a previous analysis
         const slides = generateSlides(currentStats, currentComparison);
         renderSlides(slides);
         showScreen(wrappedScreen);
@@ -278,6 +289,7 @@ function renderSlides(slides) {
     resetBtn.setAttribute('aria-label', 'Analyser un autre fichier');
     resetBtn.addEventListener('click', () => {
         history.replaceState(null, '', window.location.pathname);
+        sessionStorage.removeItem('ww-stats');
         currentStats = null;
         currentComparison = null;
         currentText = null;
@@ -441,7 +453,6 @@ $('#summary-btn').addEventListener('click', () => {
             stats: serializeStats(currentStats),
             comparison: currentComparison,
         }));
-        sessionStorage.setItem('ww-slides-pending', '1');
     } catch (e) {
         console.error('Failed to save stats:', e);
         return;
@@ -486,7 +497,7 @@ function tryLoadFromURL() {
     try {
         const json = LZString.decompressFromEncodedURIComponent(hash.slice('#share='.length));
         if (!json) return false;
-        const payload = JSON.parse(json);
+        const payload = sanitizeShared(JSON.parse(json));
         const stats = rehydrateDates(payload.s);
         currentStats = stats;
         currentComparison = payload.c || null;
@@ -501,8 +512,6 @@ function tryLoadFromURL() {
 }
 
 function tryLoadFromSession() {
-    if (!sessionStorage.getItem('ww-slides-pending')) return false;
-    sessionStorage.removeItem('ww-slides-pending');
     try {
         const raw = sessionStorage.getItem('ww-stats');
         if (!raw) return false;

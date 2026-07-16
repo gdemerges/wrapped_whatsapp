@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { parse } from '../js/parser.js';
 import { compute } from '../js/stats.js';
-import { serializeStats, rehydrateDates } from '../js/payload.js';
+import { serializeStats, rehydrateDates, sanitizeShared } from '../js/payload.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixture = (name) => readFileSync(resolve(__dirname, 'fixtures', name), 'utf-8');
@@ -25,6 +25,28 @@ describe('payload privacy', () => {
         serializeStats(stats);
         expect(stats.startDate).toBe(before);
         expect(stats.startDate).toBeInstanceOf(Date);
+    });
+});
+
+describe('sanitizeShared', () => {
+    it('strips markup from strings, including nested values and keys', () => {
+        const dirty = {
+            avgPerDay: '<img src=x onerror=alert(1)>',
+            streak: { max: '12"><b>pwn</b>' },
+            perPerson: { '<i>Eve</i>': { count: 3 } },
+            ranking: [['Alice', { percent: '<script>1</script>' }]],
+        };
+        const clean = sanitizeShared(dirty);
+        const json = JSON.stringify(clean);
+        expect(json).not.toContain('<');
+        expect(json).not.toContain('>');
+        expect(json).not.toContain('\\"><');
+        expect(clean.perPerson['iEve/i'].count).toBe(3);
+    });
+
+    it('leaves numbers, booleans and null untouched', () => {
+        const input = { a: 42, b: true, c: null, d: [1, 2.5], e: 'Léo & Zoé' };
+        expect(sanitizeShared(input)).toEqual(input);
     });
 });
 

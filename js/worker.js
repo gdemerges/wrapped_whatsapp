@@ -6,10 +6,17 @@ import { parse } from './parser.js';
 import { compute, compareYears } from './stats.js';
 import { computeSentimentML } from './worker/sentiment-ml.js';
 
+// The same text is sent several times (year listing, stats, year switch);
+// keep the last parse so each round-trip doesn't re-parse the whole file.
+let lastText = null;
+let lastParsed = null;
+
 self.onmessage = async (e) => {
     const { text, year } = e.data;
     try {
-        const all = parse(text);
+        const all = text === lastText ? lastParsed : parse(text);
+        lastText = text;
+        lastParsed = all;
         const yearCounts = {};
         for (const m of all) {
             const y = m.datetime.getFullYear();

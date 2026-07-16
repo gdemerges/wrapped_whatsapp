@@ -4,7 +4,7 @@
  */
 
 import { escapeHtml, fmt, fmtDate, DAYS_FR } from './utils.js';
-import { rehydrateDates, buildShareURL as buildShareURLShared } from './payload.js';
+import { rehydrateDates, sanitizeShared, buildShareURL as buildShareURLShared } from './payload.js';
 
 function fmtClock(date) {
     const d = date instanceof Date ? date : new Date(date);
@@ -49,7 +49,7 @@ function loadPayload() {
         try {
             const json = LZString.decompressFromEncodedURIComponent(hash.slice('#share='.length));
             if (json) {
-                const p = JSON.parse(json);
+                const p = sanitizeShared(JSON.parse(json));
                 return { stats: p.s, comparison: p.c };
             }
         } catch (e) { console.error(e); }
