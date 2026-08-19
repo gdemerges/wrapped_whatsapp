@@ -114,9 +114,10 @@ html, body {
 }
 
 .logo-icon {
-    color: var(--accent-green);
+    /* The mark carries its own gradient, so the glow follows the brand colours
+       rather than the UI accent. */
     margin-bottom: 0.75rem;
-    filter: drop-shadow(0 0 20px rgba(37, 211, 102, 0.4));
+    filter: drop-shadow(0 0 22px rgba(139, 92, 246, 0.45));
 }
 
 .logo-icon svg {
@@ -133,7 +134,8 @@ html, body {
 }
 
 .logo-title span {
-    background: linear-gradient(135deg, var(--accent-green), #38f9d7);
+    /* Same gradient as the mark, so wordmark and icon read as one system. */
+    background: linear-gradient(135deg, #8B5CF6, #EC4899);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
