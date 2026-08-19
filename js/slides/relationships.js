@@ -7,7 +7,7 @@ export function ghostingSlide(stats, gradient) {
         return `<li><strong>${escapeHtml(g.silenced)}</strong> ghosté ${days}j, relancé par <strong>${escapeHtml(g.revived)}</strong></li>`;
     }).join('');
     const revivers = stats.ghosting.revivers.slice(0, 3).map(([n, c]) =>
-        `<li><strong>${escapeHtml(n)}</strong> a relance ${c} fois</li>`
+        `<li><strong>${escapeHtml(n)}</strong> a relancé ${c} fois</li>`
     ).join('');
     return {
         gradient,
@@ -34,12 +34,12 @@ export function compatibilitySlide(stats, gradient) {
             <div class="slide-inner">
                 <span class="slide-tag">Compatibilité</span>
                 <div class="big-number">${c.score}<span style="font-size:2rem;opacity:0.7;">/100</span></div>
-                <div class="big-label">score de compatibilite</div>
+                <div class="big-label">score de compatibilité</div>
                 <div class="stat-grid">
                     <div class="stat-card"><div class="stat-value">${c.components.lengthSimilarity}</div><div class="stat-label">longueurs similaires</div></div>
-                    <div class="stat-card"><div class="stat-value">${c.components.volumeBalance}</div><div class="stat-label">equilibre des messages</div></div>
-                    <div class="stat-card"><div class="stat-value">${c.components.reciprocity}</div><div class="stat-label">reciprocite</div></div>
-                    <div class="stat-card"><div class="stat-value">${c.components.consistency}</div><div class="stat-label">regularite</div></div>
+                    <div class="stat-card"><div class="stat-value">${c.components.volumeBalance}</div><div class="stat-label">équilibre des messages</div></div>
+                    <div class="stat-card"><div class="stat-value">${c.components.reciprocity}</div><div class="stat-label">réciprocité</div></div>
+                    <div class="stat-card"><div class="stat-value">${c.components.consistency}</div><div class="stat-label">régularité</div></div>
                 </div>
             </div>
         `,
@@ -48,12 +48,12 @@ export function compatibilitySlide(stats, gradient) {
 
 export function funFactsSlide(stats, gradient) {
     const facts = [];
-    facts.push({ icon: '📅', text: `Le jour le plus actif etait le <strong>${new Date(stats.mostActiveDay[0]).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</strong> avec <strong>${stats.mostActiveDay[1]} messages</strong> !` });
+    facts.push({ icon: '📅', text: `Le jour le plus actif était le <strong>${new Date(stats.mostActiveDay[0]).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</strong> avec <strong>${stats.mostActiveDay[1]} messages</strong> !` });
     if (stats.streak.max > 1) facts.push({ icon: '🔥', text: `Record de conversation : <strong>${stats.streak.max} jours consécutifs</strong> sans interruption !` });
     if (stats.longestMessage && stats.longestMessage.msgLen > 0) facts.push({ icon: '📝', text: `Le plus long message (<strong>${fmt(stats.longestMessage.msgLen)} caractères</strong>) par <strong>${escapeHtml(stats.longestMessage.author)}</strong>` });
     if (stats.nightOwl) facts.push({ icon: '🦉', text: `Couche-tard : <strong>${escapeHtml(stats.nightOwl[0])}</strong> (${stats.nightOwl[1]} msgs entre 0h-5h)` });
-    if (stats.earlyBird) facts.push({ icon: '🐦', text: `Leve-tot : <strong>${escapeHtml(stats.earlyBird[0])}</strong> (${stats.earlyBird[1]} msgs entre 5h-8h)` });
-    if (stats.responseStats?.fastest) facts.push({ icon: '⚡', text: `Plus reactif : <strong>${escapeHtml(stats.responseStats.fastest[0])}</strong> (${fmtTime(stats.responseStats.fastest[1])})` });
+    if (stats.earlyBird) facts.push({ icon: '🐦', text: `Lève-tôt : <strong>${escapeHtml(stats.earlyBird[0])}</strong> (${stats.earlyBird[1]} msgs entre 5h-8h)` });
+    if (stats.responseStats?.fastest) facts.push({ icon: '⚡', text: `Plus réactif : <strong>${escapeHtml(stats.responseStats.fastest[0])}</strong> (${fmtTime(stats.responseStats.fastest[1])})` });
 
     return {
         gradient,

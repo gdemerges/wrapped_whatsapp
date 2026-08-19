@@ -123,3 +123,86 @@ describe('compareYears', () => {
         expect(cmp.emojis.pct).toBe(100);
     });
 });
+
+describe('stats — link domains, interactions, chapters, profiles', () => {
+    const line = (d, h, who, body) =>
+        `[${String(d).padStart(2, '0')}/03/2024 ${String(h).padStart(2, '0')}:00:00] ${who}: ${body}`;
+
+    it('buckets shared links by domain, ignoring www and ports', () => {
+        const text = [
+            line(1, 10, 'Alice', 'regarde https://www.youtube.com/watch?v=1'),
+            line(1, 11, 'Bob', 'et https://youtube.com/watch?v=2'),
+            line(2, 10, 'Alice', 'aussi https://lemonde.fr/article'),
+            line(2, 11, 'Bob', 'ok'),
+            line(3, 10, 'Alice', 'encore https://youtube.com/watch?v=3'),
+        ].join('\n');
+        const s = compute(parse(text));
+        expect(s.topDomains[0]).toEqual(['youtube.com', 3]);
+        expect(s.topDomains).toContainEqual(['lemonde.fr', 1]);
+        expect(s.perPerson.Alice.topDomain[0]).toBe('youtube.com');
+    });
+
+    it('records who answers whom within the day', () => {
+        const text = [
+            line(1, 10, 'Alice', 'salut'),
+            line(1, 11, 'Bob', 'yo'),
+            line(1, 12, 'Alice', 'ça va ?'),
+            line(1, 13, 'Bob', 'oui'),
+            line(2, 10, 'Carol', 'coucou'),
+            line(2, 11, 'Bob', 'hello Carol'),
+        ].join('\n');
+        const s = compute(parse(text));
+        expect(s.interactions.matrix.Bob.Alice).toBe(2);
+        expect(s.interactions.closest.Bob.author).toBe('Alice');
+        expect(s.interactions.pairs[0].count).toBe(3); // Alice↔Bob, both directions
+    });
+
+    it('leaves chapters empty for a conversation too short to segment', () => {
+        const text = [
+            line(1, 10, 'Alice', 'un'),
+            line(2, 10, 'Bob', 'deux'),
+            line(3, 10, 'Alice', 'trois'),
+            line(4, 10, 'Bob', 'quatre'),
+            line(5, 10, 'Alice', 'cinq'),
+        ].join('\n');
+        expect(compute(parse(text)).chapters).toEqual([]);
+    });
+
+    it('splits a conversation into chapters when the rhythm changes durably', () => {
+        const lines = [];
+        // Three quiet months, then three loud ones.
+        for (let month = 1; month <= 3; month++) {
+            for (let i = 1; i <= 4; i++) {
+                lines.push(`[0${i}/0${month}/2024 10:00:00] Alice: msg`);
+                lines.push(`[0${i}/0${month}/2024 11:00:00] Bob: msg`);
+            }
+        }
+        for (let month = 4; month <= 6; month++) {
+            for (let i = 1; i <= 25; i++) {
+                const d = String(i).padStart(2, '0');
+                lines.push(`[${d}/0${month}/2024 10:00:00] Alice: msg`);
+                lines.push(`[${d}/0${month}/2024 11:00:00] Bob: msg`);
+            }
+        }
+        const s = compute(parse(lines.join('\n')));
+        expect(s.chapters.length).toBeGreaterThanOrEqual(2);
+        expect(s.chapters[0].intensity).toBe('low');
+        expect(s.chapters[s.chapters.length - 1].intensity).toBe('high');
+    });
+
+    it('builds one profile per participant, ranked', () => {
+        const text = [
+            line(1, 22, 'Alice', 'bonsoir bonsoir bonsoir 😀'),
+            line(1, 23, 'Bob', 'salut'),
+            line(2, 22, 'Alice', 'bonsoir encore 😀'),
+            line(2, 23, 'Bob', 'ok'),
+            line(3, 22, 'Alice', 'bonsoir 😀'),
+        ].join('\n');
+        const s = compute(parse(text));
+        expect(s.profiles.map(p => p.name)).toEqual(['Alice', 'Bob']);
+        expect(s.profiles[0].topEmoji[0]).toBe('😀');
+        expect(s.profiles[0].peakHour).toBe(22);
+        expect(s.profiles[0].signatureWord[0]).toBe('bonsoir');
+        expect(s.profiles[0].initiations).toBe(3);
+    });
+});

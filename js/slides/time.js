@@ -1,13 +1,14 @@
 import { DAYS_FR } from '../utils.js';
 import { CHART_COLORS } from './_constants.js';
-import { monthLabels, cssVar } from './_helpers.js';
+import { monthLabels } from './_helpers.js';
+import { makeChart } from './_charts.js';
 
 export function monthlySlide(stats, gradient) {
     return {
         gradient,
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Activite</span>
+                <span class="slide-tag">Activité</span>
                 <h2 class="slide-title">Messages par mois</h2>
                 <div class="chart-wrapper"><canvas id="chart-monthly" height="250"></canvas></div>
             </div>
@@ -15,14 +16,14 @@ export function monthlySlide(stats, gradient) {
         chart: (ctx) => {
             const months = Object.keys(stats.monthly).sort();
             const values = months.map(k => stats.monthly[k]);
-            new Chart(ctx, {
+            makeChart(ctx, {
                 type: 'bar',
                 data: { labels: monthLabels(months), datasets: [{ data: values, backgroundColor: values.map((_, i) => `hsl(${260 + (i / Math.max(values.length - 1, 1)) * 100}, 70%, 60%)`), borderRadius: 4 }] },
                 options: {
                     responsive: true, plugins: { legend: { display: false } },
                     scales: {
-                        x: { ticks: { color: cssVar('--text-secondary'), maxRotation: 45, font: { size: 10 } }, grid: { display: false } },
-                        y: { ticks: { color: cssVar('--text-secondary') }, grid: { color: cssVar('--grid-line') } },
+                        x: { ticks: { color: 'var(--text-secondary)', maxRotation: 45, font: { size: 10 } }, grid: { display: false } },
+                        y: { ticks: { color: 'var(--text-secondary)' }, grid: { color: 'var(--grid-line)' } },
                     },
                 },
             });
@@ -72,7 +73,7 @@ export function hourlyWeekdaySlide(stats, gradient) {
         `,
         chart: (_, slide) => {
             const hourlyCtx = slide.querySelector('#chart-hourly');
-            new Chart(hourlyCtx, {
+            makeChart(hourlyCtx, {
                 type: 'bar',
                 data: {
                     labels: Array.from({ length: 24 }, (_, i) => `${i}h`),
@@ -88,20 +89,20 @@ export function hourlyWeekdaySlide(stats, gradient) {
                 options: {
                     responsive: true, plugins: { legend: { display: false } },
                     scales: {
-                        x: { ticks: { color: cssVar('--text-muted'), font: { size: 9 } }, grid: { display: false } },
-                        y: { ticks: { color: cssVar('--text-muted') }, grid: { color: cssVar('--grid-line') } },
+                        x: { ticks: { color: 'var(--text-muted)', font: { size: 9 } }, grid: { display: false } },
+                        y: { ticks: { color: 'var(--text-muted)' }, grid: { color: 'var(--grid-line)' } },
                     },
                 },
             });
             const weekdayCtx = slide.querySelector('#chart-weekday');
-            new Chart(weekdayCtx, {
+            makeChart(weekdayCtx, {
                 type: 'bar',
                 data: { labels: DAYS_FR, datasets: [{ data: stats.weekday, backgroundColor: CHART_COLORS.slice(0, 7), borderRadius: 4 }] },
                 options: {
                     responsive: true, indexAxis: 'y', plugins: { legend: { display: false } },
                     scales: {
-                        x: { ticks: { color: cssVar('--text-muted') }, grid: { color: cssVar('--grid-line') } },
-                        y: { ticks: { color: cssVar('--text-secondary'), font: { size: 11 } }, grid: { display: false } },
+                        x: { ticks: { color: 'var(--text-muted)' }, grid: { color: 'var(--grid-line)' } },
+                        y: { ticks: { color: 'var(--text-secondary)', font: { size: 11 } }, grid: { display: false } },
                     },
                 },
             });

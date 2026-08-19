@@ -1,0 +1,113 @@
+/**
+ * Period picker: a year, everything, or an arbitrary date range.
+ *
+ * The range tab is the reason this exists — "one calendar year or the whole
+ * history" is a poor fit for a conversation that matters between two dates.
+ */
+import { openDialog } from './dialog.js';
+import { escapeHtml } from '../utils.js';
+
+const fmtCount = (n) => Number(n).toLocaleString('fr-FR');
+
+/**
+ * @param {{ years: number[], yearCounts: Record<string, number>,
+ *           bounds: { from: string, to: string },
+ *           current: { year: number|null, range: {from: string, to: string}|null } }} spec
+ * @returns {Promise<{ year: number|null, range: {from: string, to: string}|null } | undefined>}
+ *   undefined when cancelled.
+ */
+export function pickPeriod({ years, yearCounts, bounds, current = { year: null, range: null } }) {
+    const minDate = bounds.from.slice(0, 10);
+    const maxDate = bounds.to.slice(0, 10);
+    const total = Object.values(yearCounts).reduce((a, b) => a + b, 0);
+
+    const yearButtons = years.map(y => `
+        <button class="period-option ${current.year === y ? 'is-current' : ''}" data-year="${y}">
+            <span class="period-value">${y}</span>
+            <span class="period-count">${fmtCount(yearCounts[y])} messages</span>
+        </button>`).join('');
+
+    const html = `
+        <div class="dialog-panel period-panel">
+            <h2 class="dialog-title">Quelle période analyser ?</h2>
+            <div class="tab-bar" role="tablist">
+                <button class="tab-btn active" role="tab" aria-selected="true" data-tab="years" data-autofocus>Par année</button>
+                <button class="tab-btn" role="tab" aria-selected="false" data-tab="range">Période libre</button>
+            </div>
+
+            <div class="tab-panel" data-panel="years">
+                <div class="period-options">
+                    ${yearButtons}
+                    <button class="period-option period-option-all ${current.year === null && !current.range ? 'is-current' : ''}" data-year="all">
+                        <span class="period-value">Toutes les années</span>
+                        <span class="period-count">${fmtCount(total)} messages</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="tab-panel" data-panel="range" hidden>
+                <label class="field">
+                    <span>Du</span>
+                    <input type="date" id="range-from" min="${minDate}" max="${maxDate}"
+                           value="${escapeHtml(current.range?.from?.slice(0, 10) || minDate)}">
+                </label>
+                <label class="field">
+                    <span>Au</span>
+                    <input type="date" id="range-to" min="${minDate}" max="${maxDate}"
+                           value="${escapeHtml(current.range?.to?.slice(0, 10) || maxDate)}">
+                </label>
+                <p class="field-error" id="range-error" role="alert" hidden></p>
+                <button class="file-btn" id="range-apply">Analyser cette période</button>
+            </div>
+
+            <button class="dialog-dismiss" data-dismiss aria-label="Fermer">Annuler</button>
+        </div>`;
+
+    return openDialog({
+        label: 'Choisir une période',
+        className: 'period-dialog',
+        html,
+        onMount(root, close) {
+            root.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    root.querySelectorAll('.tab-btn').forEach(b => {
+                        const on = b === btn;
+                        b.classList.toggle('active', on);
+                        b.setAttribute('aria-selected', String(on));
+                    });
+                    root.querySelectorAll('.tab-panel').forEach(p => {
+                        p.hidden = p.dataset.panel !== btn.dataset.tab;
+                    });
+                });
+            });
+
+            root.querySelectorAll('[data-year]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const raw = btn.dataset.year;
+                    close({ year: raw === 'all' ? null : parseInt(raw, 10), range: null });
+                });
+            });
+
+            const from = root.querySelector('#range-from');
+            const to = root.querySelector('#range-to');
+            const error = root.querySelector('#range-error');
+            root.querySelector('#range-apply').addEventListener('click', () => {
+                if (!from.value || !to.value) return fail('Choisis une date de début et de fin.');
+                if (from.value > to.value) return fail('La date de début doit précéder la date de fin.');
+                error.hidden = true;
+                close({
+                    year: null,
+                    // End of day, so the last day of the range is included.
+                    range: { from: `${from.value}T00:00:00`, to: `${to.value}T23:59:59` },
+                });
+            });
+
+            function fail(message) {
+                error.textContent = message;
+                error.hidden = false;
+            }
+
+            root.querySelector('[data-dismiss]').addEventListener('click', () => close(undefined));
+        },
+    });
+}

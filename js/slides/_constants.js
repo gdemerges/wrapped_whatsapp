@@ -1,9 +1,25 @@
-export const GRADIENTS = [
-    'slide-gradient-1', 'slide-gradient-2', 'slide-gradient-3',
-    'slide-gradient-4', 'slide-gradient-5', 'slide-gradient-6',
-    'slide-gradient-7', 'slide-gradient-8', 'slide-gradient-9',
-    'slide-gradient-10', 'slide-gradient-11',
-];
+/**
+ * Slide backgrounds are themed, not cycled.
+ *
+ * They used to be handed out round-robin from a flat list, so the colour said
+ * nothing about the content — and since every gradient sat in the same
+ * navy/violet corner, 28 slides read as one long slide. Each key below maps to
+ * a `--gradient-*` defined in css/style.css, chosen so that a section change is
+ * visible at a glance.
+ */
+export const THEME = {
+    intro:     'slide-gradient-1',   // deep indigo — the opening
+    story:     'slide-gradient-9',   // dusk violet — narrative beats
+    people:    'slide-gradient-2',   // magenta — who is who
+    time:      'slide-gradient-4',   // ocean blue — rhythms & clocks
+    words:     'slide-gradient-3',   // plum — vocabulary
+    emojis:    'slide-gradient-5',   // sunset — expression
+    media:     'slide-gradient-6',   // teal — things shared
+    relations: 'slide-gradient-8',   // ember — friction & silence
+    mood:      'slide-gradient-7',   // forest — sentiment
+    fun:       'slide-gradient-10',  // steel — trivia
+    outro:     'slide-gradient-11',  // royal — the wrap-up
+};
 
 export const CHART_COLORS = [
     '#8B5CF6', '#EC4899', '#3B82F6', '#10B981', '#F97316',

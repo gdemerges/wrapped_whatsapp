@@ -1,4 +1,3 @@
-import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.2';
 import { COMPLIMENT, INSULT } from '../lang/sentiment.js';
 import {
     SENTIMENT_MODEL, IRONY_MODEL,
@@ -8,7 +7,21 @@ import {
 } from './sentiment-config.js';
 import { newAggregator, buildResult } from './sentiment-aggregates.js';
 
-env.allowLocalModels = false;
+const TRANSFORMERS_URL = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.5.2';
+
+/**
+ * transformers.js is imported lazily: a static import pulled the library over
+ * the network as soon as the worker booted, even for users who never turn the
+ * AI analysis on.
+ */
+let _transformers = null;
+async function getPipeline() {
+    if (!_transformers) {
+        _transformers = await import(/* @vite-ignore */ TRANSFORMERS_URL);
+        _transformers.env.allowLocalModels = false;
+    }
+    return _transformers.pipeline;
+}
 
 let _sentClassifier = null;
 let _ironyClassifier = null;
@@ -27,6 +40,7 @@ async function detectDevice() {
 
 async function loadSentiment(device, onProgress) {
     if (_sentClassifier) return _sentClassifier;
+    const pipeline = await getPipeline();
     _sentClassifier = await pipeline('text-classification', SENTIMENT_MODEL, {
         device,
         dtype: device === 'webgpu' ? 'fp32' : 'q8',
@@ -43,6 +57,7 @@ async function loadIrony(device, onProgress) {
     if (_ironyClassifier === false) return null;
     if (_ironyClassifier) return _ironyClassifier;
     try {
+        const pipeline = await getPipeline();
         _ironyClassifier = await pipeline('text-classification', IRONY_MODEL, {
             device,
             dtype: device === 'webgpu' ? 'fp32' : 'q8',
@@ -141,7 +156,17 @@ async function classifyBatched(classifier, texts, batchSize, topK, mapFn, onProg
     return out;
 }
 
-export async function computeSentimentML(messages, lang, onProgress) {
+/**
+ * @param {any[]} messages
+ * @param {string} lang
+ * @param {(text: string) => void} onProgress
+ * @param {{ useML?: boolean }} [options] `useML: false` keeps everything local:
+ *   reaction polarity and the compliment/insult lexicon still run, but the
+ *   ~50 MB of transformer weights are never fetched. Opt-in by design — on a
+ *   phone that download is the single most expensive thing the app can do.
+ */
+export async function computeSentimentML(messages, lang, onProgress, options = {}) {
+    const useML = options.useML !== false;
     const byAuthor = {};
     const categorical = {};
     const reactionStats = {};
@@ -189,7 +214,7 @@ export async function computeSentimentML(messages, lang, onProgress) {
     const reactionAuthors = Object.keys(reactionStats);
     const allAuthors = Array.from(new Set([...authors, ...reactionAuthors]));
 
-    if (authors.length === 0) {
+    if (authors.length === 0 || !useML) {
         return buildResult(allAuthors, categorical, {}, reactionStats, agg.finalize(), { mlEnabled: false, device: null });
     }
 

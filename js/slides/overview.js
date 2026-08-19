@@ -3,11 +3,23 @@ import { escapeHtml, fmt, fmtDate } from '../utils.js';
 export function overviewSlide(stats, gradient) {
     return {
         gradient,
+        card: {
+            gradient,
+            tag: 'Ta conversation',
+            big: { value: fmt(stats.totalMessages), label: 'messages échangés' },
+            subtitle: `Du ${fmtDate(stats.startDate)} au ${fmtDate(stats.endDate)}`,
+            grid: [
+                [stats.participants, 'participants'],
+                [stats.totalDays, 'jours'],
+                [stats.avgPerDay, 'messages / jour'],
+                [fmt(stats.totalChars), 'caractères'],
+            ],
+        },
         html: `
             <div class="slide-inner">
                 <span class="slide-tag">Ta conversation</span>
                 <div class="big-number">${fmt(stats.totalMessages)}</div>
-                <div class="big-label">messages echanges</div>
+                <div class="big-label">messages échangés</div>
                 <p class="slide-subtitle">Du ${fmtDate(stats.startDate)} au ${fmtDate(stats.endDate)}</p>
                 <div class="stat-grid">
                     <div class="stat-card"><div class="stat-value">${stats.participants}</div><div class="stat-label">participants</div></div>
@@ -41,7 +53,7 @@ export function comparisonSlide(comparison, gradient) {
                         ${row('Messages', comparison.messages)}
                         ${row('Par jour', comparison.avgPerDay)}
                         ${row('Emojis', comparison.emojis)}
-                        ${row('Medias', comparison.media)}
+                        ${row('Médias', comparison.media)}
                         ${comparison.avgMsgLen ? row('Longueur moy.', comparison.avgMsgLen, ' car.') : ''}
                         ${comparison.streak ? row('Meilleur streak', comparison.streak, ' j') : ''}
                     </tbody>
@@ -73,12 +85,28 @@ export function wordsTrendSlide(comparison, gradient) {
     };
 }
 
-export function recapSlide(stats) {
+export function recapSlide(stats, gradient) {
     return {
-        gradient: 'slide-gradient-2',
+        gradient,
+        card: {
+            gradient,
+            tag: 'Récapitulatif',
+            title: 'Votre conversation en chiffres',
+            grid: [
+                [fmt(stats.totalMessages), 'messages'],
+                [stats.participants, 'participants'],
+                [stats.totalDays, 'jours'],
+                [fmt(stats.emojis.total), 'emojis'],
+                [fmt(stats.totalMedia), 'médias'],
+                [`${stats.streak.max}j`, 'meilleur streak'],
+            ],
+            lines: stats.ranking[0]
+                ? [`${stats.ranking[0][0]} domine avec ${stats.ranking[0][1].percent}% des messages`]
+                : [],
+        },
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Recapitulatif</span>
+                <span class="slide-tag">Récapitulatif</span>
                 <h2 class="slide-title">Votre conversation en chiffres</h2>
                 <div class="stat-grid">
                     <div class="stat-card"><div class="stat-value">${fmt(stats.totalMessages)}</div><div class="stat-label">messages</div></div>
@@ -91,7 +119,7 @@ export function recapSlide(stats) {
                 <p class="slide-subtitle" style="margin-top:1.5rem;">
                     ${stats.ranking[0] ? `<strong>${escapeHtml(stats.ranking[0][0])}</strong> domine avec ${stats.ranking[0][1].percent}% des messages` : ''}
                 </p>
-                <button class="file-btn" onclick="location.reload()" style="margin-top:1rem;">Analyser une autre conversation</button>
+                <div class="recap-actions"></div>
             </div>
         `,
     };

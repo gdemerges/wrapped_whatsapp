@@ -91,7 +91,14 @@ export function compute(messages) {
 
         if (m.isEdited) { stats.totalEdited++; person.edited++; }
 
-        if (URL_TEST_RE.test(m.message)) { stats.totalLinks++; person.links++; }
+        if (URL_TEST_RE.test(m.message)) {
+            stats.totalLinks++;
+            person.links++;
+            for (const domain of extractDomains(m.message)) {
+                stats.domainFreq[domain] = (stats.domainFreq[domain] || 0) + 1;
+                person.domainFreq[domain] = (person.domainFreq[domain] || 0) + 1;
+            }
+        }
 
         // --- Emojis ---
         const emojis = m.message.match(EMOJI_RE) || [];
@@ -99,6 +106,7 @@ export function compute(messages) {
             stats.emojiFreq[e] = (stats.emojiFreq[e] || 0) + 1;
             stats.totalEmojis++;
             person.emojis++;
+            person.emojiFreq[e] = (person.emojiFreq[e] || 0) + 1;
         }
 
         // --- Time buckets ---
@@ -108,6 +116,7 @@ export function compute(messages) {
         stats.hourly[hour]++;
         stats.weekday[day]++;
         stats.heatmap[day][hour]++;
+        person.hourly[hour]++;
 
         if (hour < 5) person.nightMsgs++;
         else if (hour < 8) person.morningMsgs++;
@@ -131,6 +140,11 @@ export function compute(messages) {
             if (prev.author !== author && diffMin > 0) {
                 if (diffMin < 1440) {
                     person.responseTimes.push(diffMin);
+                    // Directed reply edge: `author` answered `prev.author`.
+                    // Only replies within the day count, so a new conversation
+                    // opened a week later isn't read as an answer.
+                    const edges = stats.replyMatrix[author] ||= {};
+                    edges[prev.author] = (edges[prev.author] || 0) + 1;
                 }
                 // Ghost breaker: ≥24h silence then different person speaks
                 if (diffMin >= GHOST_THRESHOLD_MIN) {
@@ -182,6 +196,8 @@ function initAccumulators() {
         emojiFreq: {},
         wordFreq: {},
         wordAuthors: {}, // word → {authors: Set, count}
+        domainFreq: {},
+        replyMatrix: {}, // responder → { respondedTo: count }
         reactions: { total: 0, perAuthor: {}, perEmoji: {} },
         ghosts: [],
         initiator: {},
@@ -203,6 +219,9 @@ function newPerson() {
         morningMsgs: 0,
         responseTimes: [],
         wordFreq: {},
+        emojiFreq: {},
+        domainFreq: {},
+        hourly: new Array(24).fill(0),
     };
 }
 
@@ -238,6 +257,9 @@ function finalize(acc, messages) {
             avgResponseMin: p.responseTimes.length
                 ? Math.round(p.responseTimes.reduce((s, t) => s + t, 0) / p.responseTimes.length)
                 : null,
+            peakHour: p.hourly.indexOf(Math.max(...p.hourly)),
+            topEmoji: topEntry(p.emojiFreq),
+            topDomain: topEntry(p.domainFreq),
             _wordFreq: p.wordFreq, // kept internally, stripped before share
         };
     }
@@ -325,6 +347,13 @@ function finalize(acc, messages) {
         ? computeCompatibility(perPerson, ranking, acc)
         : null;
 
+    const topDomains = Object.entries(acc.domainFreq)
+        .sort((a, b) => b[1] - a[1]).slice(0, 12);
+
+    const interactions = buildInteractions(acc.replyMatrix);
+    const chapters = computeChapters(acc.monthly, totalDays);
+    const profiles = buildProfiles(perPerson, ranking, acc, uniqueWordsPerPerson);
+
     const result = {
         lang: acc.lang,
         startDate,
@@ -377,11 +406,150 @@ function finalize(acc, messages) {
             revivers: Object.entries(ghostInitiator).sort((a, b) => b[1] - a[1]),
             silenced: Object.entries(ghostSilenced).sort((a, b) => b[1] - a[1]),
         },
+        topDomains,
+        interactions,
+        chapters,
+        profiles,
         sentiment: null,
         compatibility,
     };
 
     return stripInternal(result);
+}
+
+/** Highest-count entry of a frequency map, or null. */
+function topEntry(freq) {
+    let best = null;
+    for (const [k, v] of Object.entries(freq)) {
+        if (!best || v > best[1]) best = [k, v];
+    }
+    return best;
+}
+
+/**
+ * Registrable-ish domain of every URL in a message.
+ * `www.` is dropped so youtube.com and www.youtube.com are one bucket;
+ * deeper subdomains are kept (they carry meaning: maps.google.com).
+ */
+function extractDomains(message) {
+    const out = [];
+    const urls = message.match(URL_RE) || [];
+    for (const raw of urls) {
+        const m = raw.match(/^https?:\/\/([^/?#\s]+)/i);
+        if (!m) continue;
+        const host = m[1].toLowerCase().replace(/^www\./, '').replace(/:\d+$/, '');
+        if (host) out.push(host);
+    }
+    return out;
+}
+
+/**
+ * Turn the directed reply matrix into a symmetric edge list plus, for each
+ * person, who they answer most. This is the group-chat counterpart of the
+ * two-person compatibility score: it says who actually talks *to whom*.
+ */
+function buildInteractions(replyMatrix) {
+    const pairTotals = new Map();
+    const closest = {};
+
+    for (const [responder, targets] of Object.entries(replyMatrix)) {
+        let best = null;
+        for (const [target, count] of Object.entries(targets)) {
+            if (!best || count > best[1]) best = [target, count];
+            const key = [responder, target].sort().join('\u0000');
+            pairTotals.set(key, (pairTotals.get(key) || 0) + count);
+        }
+        if (best) closest[responder] = { author: best[0], count: best[1] };
+    }
+
+    const pairs = [...pairTotals.entries()]
+        .map(([key, count]) => {
+            const [a, b] = key.split('\u0000');
+            return { a, b, count };
+        })
+        .sort((x, y) => y.count - x.count);
+
+    return { pairs: pairs.slice(0, 20), closest, matrix: replyMatrix };
+}
+
+/**
+ * Split the conversation into chapters of comparable intensity.
+ *
+ * Months are walked in order; a chapter ends when two consecutive months
+ * deviate from the running mean by more than CHAPTER_SHIFT in the same
+ * direction — a single quiet August shouldn't cut the story in two.
+ */
+const CHAPTER_SHIFT = 0.6;
+const MIN_CHAPTER_MONTHS = 2;
+
+function computeChapters(monthly, totalDays) {
+    const months = Object.keys(monthly).sort();
+    if (months.length < 4) return [];
+
+    const overallMean = months.reduce((s, m) => s + monthly[m], 0) / months.length;
+    const segments = [];
+    let current = { months: [months[0]], sum: monthly[months[0]] };
+
+    for (let i = 1; i < months.length; i++) {
+        const value = monthly[months[i]];
+        const mean = current.sum / current.months.length;
+        const deviation = mean > 0 ? (value - mean) / mean : 0;
+        const next = months[i + 1] != null ? monthly[months[i + 1]] : null;
+        const nextDeviation = next != null && mean > 0 ? (next - mean) / mean : deviation;
+        const sustained = Math.abs(deviation) > CHAPTER_SHIFT &&
+                          Math.sign(deviation) === Math.sign(nextDeviation) &&
+                          Math.abs(nextDeviation) > CHAPTER_SHIFT / 2;
+
+        if (sustained && current.months.length >= MIN_CHAPTER_MONTHS) {
+            segments.push(current);
+            current = { months: [months[i]], sum: value };
+        } else {
+            current.months.push(months[i]);
+            current.sum += value;
+        }
+    }
+    segments.push(current);
+    if (segments.length < 2) return [];
+
+    return segments.map((seg) => {
+        const mean = seg.sum / seg.months.length;
+        const ratio = overallMean > 0 ? mean / overallMean : 1;
+        return {
+            from: seg.months[0],
+            to: seg.months[seg.months.length - 1],
+            months: seg.months.length,
+            total: seg.sum,
+            avgPerMonth: Math.round(mean),
+            intensity: ratio >= 1.35 ? 'high' : ratio <= 0.65 ? 'low' : 'steady',
+            ratio: Math.round(ratio * 100) / 100,
+        };
+    }).filter(() => totalDays > 0);
+}
+
+/**
+ * A compact identity card per participant, assembled from figures already
+ * computed above — no extra pass over the messages.
+ */
+function buildProfiles(perPerson, ranking, acc, uniqueWords) {
+    return ranking.map(([name, p]) => ({
+        name,
+        count: p.count,
+        percent: p.percent,
+        avgLen: p.avgLen,
+        peakHour: p.peakHour,
+        emojis: p.emojis,
+        topEmoji: p.topEmoji,
+        media: p.media,
+        links: p.links,
+        topDomain: p.topDomain,
+        avgResponseMin: p.avgResponseMin,
+        initiations: acc.initiator[name] || 0,
+        // A word only this person uses is far more telling than their most
+        // frequent one — which, in a group, is usually the same for everybody.
+        signatureWord: uniqueWords?.[name]?.[0] || (p._wordFreq && topEntry(p._wordFreq)) || null,
+        nightMsgs: p.nightMsgs,
+        morningMsgs: p.morningMsgs,
+    }));
 }
 
 function stripInternal(stats) {

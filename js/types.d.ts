@@ -26,6 +26,43 @@ export interface PerPerson {
     nightMsgs: number;
     morningMsgs: number;
     avgResponseMin: number | null;
+    peakHour: number;
+    topEmoji: [string, number] | null;
+    topDomain: [string, number] | null;
+}
+
+export interface Chapter {
+    from: string;
+    to: string;
+    months: number;
+    total: number;
+    avgPerMonth: number;
+    intensity: 'high' | 'steady' | 'low';
+    ratio: number;
+}
+
+export interface Interactions {
+    pairs: Array<{ a: string; b: string; count: number }>;
+    closest: Record<string, { author: string; count: number }>;
+    matrix: Record<string, Record<string, number>>;
+}
+
+export interface Profile {
+    name: string;
+    count: number;
+    percent: string;
+    avgLen: number;
+    peakHour: number;
+    emojis: number;
+    topEmoji: [string, number] | null;
+    media: number;
+    links: number;
+    topDomain: [string, number] | null;
+    avgResponseMin: number | null;
+    initiations: number;
+    signatureWord: [string, number] | null;
+    nightMsgs: number;
+    morningMsgs: number;
 }
 
 export interface MediaTypes {
@@ -143,6 +180,10 @@ export interface Stats {
         revivers: Array<[string, number]>;
         silenced: Array<[string, number]>;
     };
+    topDomains: Array<[string, number]>;
+    interactions: Interactions;
+    chapters: Chapter[];
+    profiles: Profile[];
     sentiment: SentimentResult | null;
     compatibility: Compatibility | null;
 }
@@ -159,16 +200,50 @@ export interface YearComparison {
     disappeared: Array<[string, number]>;
 }
 
-export type WorkerInbound = { text: string; year?: number | null };
+export interface DateRange { from: string; to: string }
+
+export interface ParseDiagnostics {
+    totalLines: number;
+    matched: number;
+    detected: boolean;
+    samples: string[];
+}
+
+export type WorkerInbound =
+    | { kind: 'load'; blob: Blob }
+    | { kind: 'stats'; year?: number | null; range?: DateRange | null; ai?: boolean }
+    | { kind: 'reset' };
+
 export type WorkerOutbound =
-    | { kind: 'years'; years: number[]; yearCounts: Record<string, number> }
+    | { kind: 'years'; years: number[]; yearCounts: Record<string, number>; bounds: DateRange }
     | { kind: 'progress'; text: string }
-    | { kind: 'stats'; stats: Stats; comparison: YearComparison | null }
-    | { kind: 'error'; message: string };
+    | { kind: 'stats'; stats: Stats; comparison: YearComparison | null; cached: boolean }
+    | { kind: 'error'; message: string; diagnostics: ParseDiagnostics | null };
+
+export interface CardBar {
+    label: string;
+    value: string;
+    ratio: number;
+    color?: string;
+}
+
+/** Plain-data description of a slide, for the 1080x1920 image export. */
+export interface SlideCard {
+    gradient: string;
+    tag?: string;
+    title?: string;
+    subtitle?: string;
+    big?: { value: string; label: string };
+    grid?: Array<[string | number, string]>;
+    bars?: CardBar[];
+    emojis?: Array<[string, number]>;
+    lines?: string[];
+}
 
 export interface Slide {
     gradient: string;
     html: string;
+    card?: SlideCard;
     chart?: (ctx: HTMLCanvasElement | CanvasRenderingContext2D, slide: HTMLElement) => void;
 }
 

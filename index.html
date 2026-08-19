@@ -2,29 +2,29 @@
 <html lang="fr" data-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' blob: https://huggingface.co https://cdn.jsdelivr.net; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'">
     <meta name="referrer" content="no-referrer">
     <title>WhatsApp Wrapped</title>
     <meta name="description" content="Analyse tes conversations WhatsApp et génère une présentation animée, 100% dans ton navigateur.">
+    <meta name="theme-color" content="#0a0a0a">
     <meta property="og:type" content="website">
     <meta property="og:title" content="WhatsApp Wrapped">
     <meta property="og:description" content="Analyse tes conversations WhatsApp et génère une présentation animée, 100% dans ton navigateur.">
-    <meta property="og:image" content="favicon.svg">
-    <meta name="twitter:card" content="summary">
+    <meta property="og:image" content="icons/icon-512.png">
+    <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="WhatsApp Wrapped">
     <meta name="twitter:description" content="Analyse tes conversations WhatsApp et génère une présentation animée, 100% dans ton navigateur.">
-    <meta name="twitter:image" content="favicon.svg">
+    <meta name="twitter:image" content="icons/icon-512.png">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
     <link rel="manifest" href="manifest.json">
+    <link rel="preload" href="fonts/space-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-    <link rel="preconnect" href="https://huggingface.co" crossorigin>
-    <link rel="stylesheet" href="css/style.css?v=2">
-    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js" integrity="sha384-0d+Gr7vM4Drod8E3hXKgciWJSWbjD/opKLLygI9ktiWbuvlDwQLzU46wJ9s5gsp7" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="css/style.css?v=3">
 </head>
 <body>
-    <button id="theme-toggle" class="theme-toggle" aria-label="Changer le thème" title="Changer le thème">
+    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Changer le thème" title="Changer le thème">
         <svg class="theme-icon-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         <svg class="theme-icon-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
     </button>
@@ -43,25 +43,38 @@
             </div>
             <p class="upload-subtitle">Découvre les stats cachées de tes conversations</p>
 
-            <div class="how-to">
-                <h3>Comment exporter ta conversation ?</h3>
-                <div class="steps">
-                    <div class="step"><div class="step-number" aria-hidden="true">1</div><p>Ouvre la conversation WhatsApp</p></div>
-                    <div class="step"><div class="step-number" aria-hidden="true">2</div><p>Appuie sur le nom du groupe/contact en haut</p></div>
-                    <div class="step"><div class="step-number" aria-hidden="true">3</div><p>Descends et appuie sur <strong>"Exporter la discussion"</strong></p></div>
-                    <div class="step"><div class="step-number" aria-hidden="true">4</div><p>Choisis <strong>"Sans médias"</strong>, puis importe le fichier ici — le <strong>.zip</strong> marche directement, pas besoin de le décompresser</p></div>
-                </div>
-            </div>
-
             <div class="drop-zone" id="drop-zone" tabindex="0" role="button" aria-label="Déposer un fichier WhatsApp exporté">
                 <div class="drop-icon" aria-hidden="true">+</div>
                 <p>Glisse ton fichier .txt ou .zip ici</p>
                 <p class="drop-or">ou</p>
                 <label class="file-btn">
                     Choisir un fichier
-                    <input type="file" id="file-input" accept=".txt,.zip" hidden>
+                    <input type="file" id="file-input" accept=".txt,.zip,text/plain,application/zip" hidden>
                 </label>
             </div>
+
+            <button type="button" class="ghost-btn" id="demo-btn">
+                Pas de fichier sous la main ? <strong>Voir un exemple</strong>
+            </button>
+
+            <label class="switch-row switch-row-compact">
+                <input type="checkbox" id="ai-toggle">
+                <span>
+                    <strong>Analyse de sentiment par IA</strong>
+                    <small>Plus fine, mais télécharge ~50 Mo de modèle. Sans elle, l'ambiance est déduite des emojis et du vocabulaire.</small>
+                </span>
+            </label>
+
+            <details class="how-to">
+                <summary><h3>Comment exporter ta conversation ?</h3></summary>
+                <div class="steps">
+                    <div class="step"><div class="step-number" aria-hidden="true">1</div><p>Ouvre la conversation WhatsApp</p></div>
+                    <div class="step"><div class="step-number" aria-hidden="true">2</div><p>Appuie sur le nom du groupe/contact en haut</p></div>
+                    <div class="step"><div class="step-number" aria-hidden="true">3</div><p>Descends et appuie sur <strong>« Exporter la discussion »</strong></p></div>
+                    <div class="step"><div class="step-number" aria-hidden="true">4</div><p>Choisis <strong>« Sans médias »</strong>, puis importe le fichier ici — le <strong>.zip</strong> marche directement, pas besoin de le décompresser</p></div>
+                </div>
+            </details>
+
             <p class="privacy-note">Tes données restent sur ton appareil. Rien n'est envoyé à un serveur.</p>
         </div>
     </div>
@@ -75,18 +88,49 @@
         </div>
     </div>
 
-    <!-- Wrapped Slides -->
-    <div id="wrapped-screen" class="screen" role="region" aria-label="Résultats">
-        <div class="slides-container" id="slides-container"></div>
-        <div class="slide-counter" id="slide-counter" aria-hidden="true"></div>
-        <div class="nav-dots" id="nav-dots" role="tablist" aria-label="Navigation entre les slides"></div>
-        <button class="nav-arrow nav-prev" id="nav-prev" aria-label="Slide précédente">&larr;</button>
-        <button class="nav-arrow nav-next" id="nav-next" aria-label="Slide suivante">&rarr;</button>
-        <div class="swipe-hint" id="swipe-hint" aria-hidden="true">Swipe ou utilise les flèches &rarr;</div>
-        <button class="summary-btn" id="summary-btn" aria-label="Voir le dashboard complet">Dashboard</button>
+    <!-- Error Screen -->
+    <div id="error-screen" class="screen" role="region" aria-label="Erreur de lecture">
+        <div class="error-container">
+            <div class="error-icon" aria-hidden="true">🧐</div>
+            <h2 class="error-title">Ce fichier n'a pas pu être lu</h2>
+            <p class="error-message" id="error-message"></p>
+            <div class="error-diagnostics" id="error-diagnostics" hidden></div>
+            <div class="error-actions">
+                <button type="button" class="file-btn" id="error-retry">Choisir un autre fichier</button>
+                <button type="button" class="ghost-btn" id="error-demo">Voir un exemple à la place</button>
+            </div>
+        </div>
     </div>
 
-<div class="share-toast" id="share-toast" role="status">Lien copié !</div>
+    <!-- Wrapped Slides -->
+    <div id="wrapped-screen" class="screen" role="region" aria-label="Résultats">
+        <div class="story-progress" id="story-progress" role="tablist" aria-label="Navigation entre les slides"></div>
+        <div class="slides-container" id="slides-container"></div>
+        <div class="slide-counter" id="slide-counter" aria-hidden="true"></div>
+        <button class="nav-arrow nav-prev" type="button" id="nav-prev" aria-label="Slide précédente">&larr;</button>
+        <button class="nav-arrow nav-next" type="button" id="nav-next" aria-label="Slide suivante">&rarr;</button>
+        <div class="swipe-hint" id="swipe-hint" aria-hidden="true">Swipe ou utilise les flèches &rarr;</div>
+
+        <div class="deck-toolbar" id="deck-toolbar">
+            <button class="toolbar-btn" type="button" id="summary-btn" aria-label="Voir le dashboard complet">
+                <span aria-hidden="true">📊</span><span class="toolbar-label">Dashboard</span>
+            </button>
+            <button class="toolbar-btn" type="button" id="story-toggle" aria-pressed="false" aria-label="Lecture automatique">
+                <span aria-hidden="true">▶</span><span class="toolbar-label">Lecture auto</span>
+            </button>
+            <button class="toolbar-btn" type="button" id="period-btn" hidden aria-label="Changer la période analysée">
+                <span aria-hidden="true">📅</span><span class="toolbar-label" id="period-label">Période</span>
+            </button>
+            <button class="toolbar-btn toolbar-btn-primary" type="button" id="share-btn" aria-label="Partager">
+                <span aria-hidden="true">↗</span><span class="toolbar-label">Partager</span>
+            </button>
+            <button class="toolbar-btn" type="button" id="reset-btn" aria-label="Analyser un autre fichier">
+                <span aria-hidden="true">↺</span><span class="toolbar-label">Nouvelle analyse</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="share-toast" id="share-toast" role="status"></div>
 
     <!-- Screen-reader announcements -->
     <div id="a11y-live" class="sr-only" aria-live="polite" aria-atomic="true"></div>

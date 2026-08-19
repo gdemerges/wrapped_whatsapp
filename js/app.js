@@ -1,33 +1,52 @@
 /**
- * Main app — file upload, worker orchestration, navigation, rendering.
+ * App orchestration: file intake, worker plumbing, screens.
+ *
+ * The deck itself lives in deck.js, dialogs in ui/, sharing in ui/share.js —
+ * this file only decides *what* happens, not how it looks.
  */
 
 import { generateSlides } from './slides/index.js';
-import { serializeStats, rehydrateDates, buildShareURL, sanitizeShared } from './payload.js';
-import { hashFile, getCached, setCached } from './cache.js';
+import { serializeStats, rehydrateDates, sanitizeShared } from './payload.js';
+import { Deck, bindNavigation } from './deck.js';
+import { pickPeriod } from './ui/period.js';
+import { openShareSheet } from './ui/share.js';
+import { showToast, showError, announce } from './ui/toast.js';
+import { readHash, clearHash } from './ui/hash.js';
+import { ensureJSZip, ensureLZString, preload } from './vendor.js';
+import { buildDemoBlob } from './demo.js';
+import { escapeHtml } from './utils.js';
 
 const $ = (sel) => document.querySelector(sel);
 
-const uploadScreen = $('#upload-screen');
-const loadingScreen = $('#loading-screen');
-const wrappedScreen = $('#wrapped-screen');
-const slidesContainer = $('#slides-container');
-const navDots = $('#nav-dots');
+const screens = {
+    upload: $('#upload-screen'),
+    loading: $('#loading-screen'),
+    error: $('#error-screen'),
+    wrapped: $('#wrapped-screen'),
+};
 const fileInput = $('#file-input');
 const dropZone = $('#drop-zone');
 const loadingStatus = $('#loading-status');
-const liveRegion = $('#a11y-live');
+const aiToggle = $('#ai-toggle');
 
-let currentSlide = 0;
-let totalSlides = 0;
-let slideElements = [];
-let chartInitialized = {};
-let currentStats = null;
-let currentComparison = null;
-let currentText = null;
-let availableYears = [];
-let availableYearCounts = {};
-let currentYear = null;
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+const AI_KEY = 'ww-use-ai';
+const SESSION_KEY = 'ww-stats';
+
+/** @type {{ stats: any, comparison: any, slides: any[] } | null} */
+let session = null;
+let period = { year: null, range: null };
+let periodOptions = null; // { years, yearCounts, bounds }
+
+const deck = new Deck({
+    container: $('#slides-container'),
+    counter: $('#slide-counter'),
+    progress: $('#story-progress'),
+    onSlideChange: () => {
+        const hint = $('#swipe-hint');
+        if (hint) hint.style.display = 'none';
+    },
+});
 
 // ========== Service worker ==========
 if ('serviceWorker' in navigator) {
@@ -38,59 +57,84 @@ if ('serviceWorker' in navigator) {
 
 // ========== Theme ==========
 initTheme();
-
 function initTheme() {
     const saved = localStorage.getItem('theme') || 'dark';
     document.documentElement.dataset.theme = saved;
     const btn = $('#theme-toggle');
-    if (btn) {
-        updateThemeBtn(btn, saved);
-        btn.addEventListener('click', () => {
-            const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-            document.documentElement.dataset.theme = next;
-            localStorage.setItem('theme', next);
-            updateThemeBtn(btn, next);
-        });
-    }
+    if (!btn) return;
+    labelThemeBtn(btn, saved);
+    btn.addEventListener('click', () => {
+        const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = next;
+        localStorage.setItem('theme', next);
+        labelThemeBtn(btn, next);
+        // Charts are painted on canvas and cannot follow a CSS variable.
+        deck.retint();
+    });
 }
 
-function updateThemeBtn(btn, theme) {
-    btn.setAttribute('aria-label', theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre');
+function labelThemeBtn(btn, theme) {
+    const label = theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre';
+    btn.setAttribute('aria-label', label);
     btn.setAttribute('title', theme === 'dark' ? 'Mode clair' : 'Mode sombre');
 }
 
-// ========== Screen ==========
-function showScreen(screen) {
-    [uploadScreen, loadingScreen, wrappedScreen].forEach(s => s.classList.remove('active'));
-    screen.classList.add('active');
+// ========== AI toggle ==========
+if (aiToggle) {
+    aiToggle.checked = localStorage.getItem(AI_KEY) === 'true';
+    aiToggle.addEventListener('change', () => {
+        localStorage.setItem(AI_KEY, String(aiToggle.checked));
+    });
 }
+const useAI = () => localStorage.getItem(AI_KEY) === 'true';
 
-function announce(msg) {
-    if (liveRegion) liveRegion.textContent = msg;
+// ========== Screens ==========
+function showScreen(name) {
+    for (const [key, el] of Object.entries(screens)) el.classList.toggle('active', key === name);
 }
 
 // ========== Worker ==========
 let worker = null;
-function callWorker(text, year) {
+
+function getWorker() {
+    if (!worker) worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+    return worker;
+}
+
+/**
+ * One request/response round-trip. Progress messages are streamed to the
+ * loading screen; the first non-progress message settles the promise.
+ */
+function callWorker(message, transfer = []) {
     return new Promise((resolve, reject) => {
-        if (!worker) worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
-        const onMsg = (e) => {
-            if (e.data.kind === 'error') {
-                worker.removeEventListener('message', onMsg);
-                reject(new Error(e.data.message));
-            } else if (e.data.kind === 'progress') {
+        const w = getWorker();
+        const onMessage = (e) => {
+            if (e.data.kind === 'progress') {
                 loadingStatus.textContent = e.data.text;
+                return;
+            }
+            w.removeEventListener('message', onMessage);
+            w.removeEventListener('error', onError);
+            if (e.data.kind === 'error') {
+                const err = new Error(e.data.message);
+                err.diagnostics = e.data.diagnostics;
+                reject(err);
             } else {
-                worker.removeEventListener('message', onMsg);
                 resolve(e.data);
             }
         };
-        worker.addEventListener('message', onMsg);
-        worker.postMessage({ text, year });
+        const onError = (e) => {
+            w.removeEventListener('message', onMessage);
+            w.removeEventListener('error', onError);
+            reject(new Error(e.message || 'Le calcul a échoué'));
+        };
+        w.addEventListener('message', onMessage);
+        w.addEventListener('error', onError);
+        w.postMessage(message, transfer);
     });
 }
 
-// ========== File handling ==========
+// ========== File intake ==========
 fileInput.addEventListener('change', (e) => {
     if (e.target.files[0]) handleFile(e.target.files[0]);
 });
@@ -109,7 +153,7 @@ dropZone.addEventListener('drop', (e) => {
 let dragDepth = 0;
 window.addEventListener('dragenter', (e) => {
     if (!e.dataTransfer?.types?.includes('Files')) return;
-    if (!uploadScreen.classList.contains('active')) return;
+    if (!screens.upload.classList.contains('active')) return;
     dragDepth++;
     document.body.classList.add('dragging-file');
 });
@@ -122,450 +166,298 @@ window.addEventListener('dragover', (e) => {
 });
 window.addEventListener('drop', (e) => {
     if (!e.dataTransfer?.files?.length) return;
-    if (!uploadScreen.classList.contains('active')) return;
+    if (!screens.upload.classList.contains('active')) return;
     e.preventDefault();
     dragDepth = 0;
     document.body.classList.remove('dragging-file');
     if (!dropZone.contains(e.target)) handleFile(e.dataTransfer.files[0]);
 });
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+$('#demo-btn').addEventListener('click', () => runDemo());
+$('#error-demo').addEventListener('click', () => runDemo());
+$('#error-retry').addEventListener('click', () => {
+    showScreen('upload');
+    fileInput.value = '';
+    fileInput.click();
+});
+
+function runDemo() {
+    showToast('Conversation d\'exemple — données fictives');
+    handleBlob(buildDemoBlob(), { demo: true });
+}
 
 async function handleFile(file) {
     if (file.size > MAX_FILE_SIZE) {
-        showError(`Fichier trop volumineux (max ${Math.round(MAX_FILE_SIZE / 1024 / 1024)} Mo)`);
+        showFatal(`Fichier trop volumineux (max ${Math.round(MAX_FILE_SIZE / 1024 / 1024)} Mo).`);
+        return;
+    }
+    if (!/\.(txt|zip)$/i.test(file.name)) {
+        showFatal('Formats acceptés : .txt et .zip (l\'export WhatsApp, tel quel).');
         return;
     }
 
-    showScreen(loadingScreen);
+    showScreen('loading');
+    try {
+        const blob = file.name.toLowerCase().endsWith('.zip') ? await unzip(file) : file;
+        await handleBlob(blob);
+    } catch (err) {
+        console.error(err);
+        showFatal(err.message, err.diagnostics);
+    }
+}
+
+async function handleBlob(blob, { demo = false } = {}) {
+    showScreen('loading');
     announce('Analyse en cours');
+    // Likely needed within seconds; warmed here so the first chart slide and
+    // the first share don't pay for the round-trip.
+    preload('chart');
 
     try {
-        let text;
-        if (file.name.endsWith('.zip')) {
-            loadingStatus.textContent = 'Décompression...';
-            await loadJSZip();
-            const zip = await JSZip.loadAsync(file);
-            const txtFile = Object.values(zip.files).find(f => f.name.endsWith('.txt'));
-            if (!txtFile) throw new Error('Aucun fichier .txt trouvé dans le ZIP');
-            // The 50 MB cap above applies to the *compressed* file; a small zip
-            // can inflate to gigabytes. Check the declared uncompressed size
-            // (internal JSZip field, may be absent) and re-check after inflate.
-            const declaredSize = txtFile._data?.uncompressedSize;
-            if (typeof declaredSize === 'number' && declaredSize > MAX_FILE_SIZE) {
-                throw new Error(`Fichier décompressé trop volumineux (max ${Math.round(MAX_FILE_SIZE / 1024 / 1024)} Mo)`);
-            }
-            text = await txtFile.async('string', (meta) => {
-                loadingStatus.textContent = `Décompression... ${Math.round(meta.percent)}%`;
-            });
-            if (text.length > MAX_FILE_SIZE) {
-                throw new Error(`Fichier décompressé trop volumineux (max ${Math.round(MAX_FILE_SIZE / 1024 / 1024)} Mo)`);
-            }
-        } else {
-            loadingStatus.textContent = 'Lecture du fichier...';
-            text = await file.text();
+        const info = await callWorker({ kind: 'load', blob });
+        if (info.kind !== 'years') throw new Error('Réponse worker invalide');
+
+        periodOptions = { years: info.years, yearCounts: info.yearCounts, bounds: info.bounds };
+        period = { year: info.years.length === 1 ? info.years[0] : null, range: null };
+
+        if (info.years.length > 1 && !demo) {
+            showScreen('upload');
+            const chosen = await pickPeriod({ ...periodOptions, current: period });
+            if (chosen === undefined) { showScreen('upload'); return; } // cancelled
+            period = chosen;
         }
 
-        loadingStatus.textContent = 'Analyse des messages...';
-        const yearsInfo = await callWorker(text);
-        if (yearsInfo.kind !== 'years') throw new Error('Réponse worker invalide');
+        await computeAndShow();
+    } catch (err) {
+        console.error(err);
+        showFatal(err.message, err.diagnostics);
+    }
+}
 
-        currentText = text;
-        availableYears = yearsInfo.years;
-        availableYearCounts = yearsInfo.yearCounts;
+async function computeAndShow() {
+    showScreen('loading');
+    loadingStatus.textContent = 'Calcul des stats...';
+    const result = await callWorker({ kind: 'stats', year: period.year, range: period.range, ai: useAI() });
+    if (result.kind !== 'stats') throw new Error('Calcul échoué');
 
-        let selectedYear = null;
-        if (yearsInfo.years.length > 1) {
-            showScreen(uploadScreen);
-            selectedYear = await pickYear(yearsInfo.years, yearsInfo.yearCounts);
-            showScreen(loadingScreen);
-        } else {
-            selectedYear = yearsInfo.years[0];
-        }
-        currentYear = selectedYear;
+    sessionStorage.removeItem(SESSION_KEY); // drop stats from a previous analysis
+    present(rehydrateDates(result.stats), result.comparison);
+}
 
-        const cacheKey = await hashFile(text + '|y=' + selectedYear);
-        const cached = await getCached(cacheKey);
-        let result;
-        if (cached) {
-            loadingStatus.textContent = 'Restauration depuis le cache...';
-            result = { kind: 'stats', stats: cached.stats, comparison: cached.comparison };
-        } else {
-            loadingStatus.textContent = 'Calcul des stats...';
-            result = await callWorker(text, selectedYear);
-            if (result.kind !== 'stats') throw new Error('Calcul échoué');
-            setCached(cacheKey, { stats: result.stats, comparison: result.comparison, year: selectedYear });
-        }
+async function unzip(file) {
+    loadingStatus.textContent = 'Décompression...';
+    await ensureJSZip();
+    const zip = await window.JSZip.loadAsync(file);
+    const entry = Object.values(zip.files).find(f => !f.dir && f.name.toLowerCase().endsWith('.txt'));
+    if (!entry) throw new Error('Aucun fichier .txt trouvé dans le ZIP.');
 
-        currentStats = rehydrateDates(result.stats);
-        currentComparison = result.comparison;
+    // The 50 MB cap applies to the *compressed* file; a small zip can inflate
+    // to gigabytes. Check the declared size first, then the real one.
+    const declared = entry._data?.uncompressedSize;
+    if (typeof declared === 'number' && declared > MAX_FILE_SIZE) {
+        throw new Error(`Fichier décompressé trop volumineux (max ${Math.round(MAX_FILE_SIZE / 1024 / 1024)} Mo).`);
+    }
+    const blob = await entry.async('blob', (meta) => {
+        loadingStatus.textContent = `Décompression... ${Math.round(meta.percent)}%`;
+    });
+    if (blob.size > MAX_FILE_SIZE) {
+        throw new Error(`Fichier décompressé trop volumineux (max ${Math.round(MAX_FILE_SIZE / 1024 / 1024)} Mo).`);
+    }
+    return blob;
+}
 
-        loadingStatus.textContent = 'Génération du Wrapped...';
-        sessionStorage.removeItem('ww-stats'); // drop stats from a previous analysis
-        const slides = generateSlides(currentStats, currentComparison);
-        renderSlides(slides);
-        showScreen(wrappedScreen);
-        announce(`${currentStats.totalMessages} messages analysés`);
+// ========== Presentation ==========
+function present(stats, comparison) {
+    const slides = generateSlides(stats, comparison);
+    session = { stats, comparison, slides };
+    deck.mount(slides);
+    wireRecapActions();
+    updatePeriodButton();
+    showScreen('wrapped');
+    announce(`${stats.totalMessages} messages analysés`);
+}
+
+/** The last slide offers the same actions as the toolbar, at thumb height. */
+function wireRecapActions() {
+    const host = deck.refs.container.querySelector('.recap-actions');
+    if (!host) return;
+    host.innerHTML = '';
+
+    const share = document.createElement('button');
+    share.type = 'button';
+    share.className = 'file-btn';
+    share.textContent = 'Partager';
+    share.addEventListener('click', openShare);
+
+    const again = document.createElement('button');
+    again.type = 'button';
+    again.className = 'ghost-btn';
+    again.textContent = 'Analyser une autre conversation';
+    again.addEventListener('click', resetAll);
+
+    host.append(share, again);
+}
+
+function updatePeriodButton() {
+    const btn = $('#period-btn');
+    const label = $('#period-label');
+    // Shown whenever a file is loaded — even a single-year chat can be sliced
+    // into a custom range. Hidden only for a deck restored from a share link,
+    // where there is no source file to re-slice.
+    if (!periodOptions) {
+        btn.hidden = true;
+        return;
+    }
+    btn.hidden = false;
+    label.textContent = period.range
+        ? `${period.range.from.slice(0, 10)} → ${period.range.to.slice(0, 10)}`
+        : (period.year == null ? 'Toutes les années' : String(period.year));
+}
+
+// ========== Toolbar ==========
+$('#nav-prev').addEventListener('click', () => { deck.stopStory(); deck.prev(); });
+$('#nav-next').addEventListener('click', () => { deck.stopStory(); deck.next(); });
+bindNavigation(deck, () => screens.wrapped.classList.contains('active'));
+
+$('#story-toggle').addEventListener('click', (e) => {
+    const playing = deck.toggleStory();
+    const btn = e.currentTarget;
+    btn.setAttribute('aria-pressed', String(playing));
+    btn.querySelector('span[aria-hidden]').textContent = playing ? '❚❚' : '▶';
+    btn.querySelector('.toolbar-label').textContent = playing ? 'Pause' : 'Lecture auto';
+});
+
+$('#period-btn').addEventListener('click', async () => {
+    if (!periodOptions) return;
+    deck.stopStory();
+    const chosen = await pickPeriod({ ...periodOptions, current: period });
+    if (chosen === undefined) return;
+    if (chosen.year === period.year && sameRange(chosen.range, period.range)) return;
+    period = chosen;
+    try {
+        await computeAndShow();
     } catch (err) {
         console.error(err);
         showError(err.message);
-        showScreen(uploadScreen);
+        showScreen('wrapped');
     }
-}
+});
 
-function loadJSZip() {
-    if (window.JSZip) return Promise.resolve();
-    return new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
-        s.integrity = 'sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG';
-        s.crossOrigin = 'anonymous';
-        s.onload = resolve;
-        s.onerror = () => reject(new Error('Impossible de charger JSZip'));
-        document.head.appendChild(s);
+$('#share-btn').addEventListener('click', openShare);
+
+function openShare() {
+    if (!session) return;
+    deck.stopStory();
+    const recap = session.slides[session.slides.length - 1]?.card || null;
+    openShareSheet({
+        stats: session.stats,
+        comparison: session.comparison,
+        card: deck.current?.card || null,
+        recapCard: recap,
     });
 }
 
-// ========== Year picker ==========
-function pickYear(years, yearCounts) {
-    return new Promise((resolve) => {
-        const previouslyFocused = document.activeElement;
-        const overlay = document.createElement('div');
-        overlay.className = 'year-picker-overlay';
-        overlay.setAttribute('role', 'dialog');
-        overlay.setAttribute('aria-modal', 'true');
-        overlay.setAttribute('aria-label', 'Choisir une année');
-        overlay.innerHTML = `
-            <div class="year-picker">
-                <h2>Quelle année analyser ?</h2>
-                <p style="color:var(--text-muted);margin-bottom:1.5rem;font-size:0.9rem;">Plusieurs années détectées</p>
-                <div class="year-options">
-                    ${years.map(y => `
-                        <button class="year-btn" data-year="${y}">
-                            <span class="year-value">${y}</span>
-                            <span class="year-count">${yearCounts[y].toLocaleString('fr-FR')} messages</span>
-                        </button>`).join('')}
-                    <button class="year-btn year-btn-all" data-year="all">
-                        <span class="year-value">Toutes les années</span>
-                        <span class="year-count">${Object.values(yearCounts).reduce((a, b) => a + b, 0).toLocaleString('fr-FR')} messages</span>
-                    </button>
-                </div>
-            </div>`;
-        document.body.appendChild(overlay);
-        requestAnimationFrame(() => overlay.classList.add('active'));
+$('#reset-btn').addEventListener('click', resetAll);
 
-        const focusable = Array.from(overlay.querySelectorAll('.year-btn'));
-        focusable[0]?.focus();
-
-        function close(value) {
-            document.removeEventListener('keydown', onKeydown);
-            overlay.remove();
-            previouslyFocused?.focus?.();
-            resolve(value);
-        }
-
-        function onKeydown(e) {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                close(null); // default to "all years", the same as the explicit option
-            } else if (e.key === 'Tab' && focusable.length > 0) {
-                // Trap focus inside the dialog — there's nothing else to Tab to.
-                const first = focusable[0];
-                const last = focusable[focusable.length - 1];
-                if (e.shiftKey && document.activeElement === first) {
-                    e.preventDefault();
-                    last.focus();
-                } else if (!e.shiftKey && document.activeElement === last) {
-                    e.preventDefault();
-                    first.focus();
-                }
-            }
-        }
-        document.addEventListener('keydown', onKeydown);
-
-        overlay.querySelectorAll('.year-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const raw = btn.dataset.year;
-                close(raw === 'all' ? null : parseInt(raw));
-            });
-        });
-    });
+function resetAll() {
+    clearHash();
+    sessionStorage.removeItem(SESSION_KEY);
+    deck.clear();
+    getWorker().postMessage({ kind: 'reset' });
+    session = null;
+    period = { year: null, range: null };
+    periodOptions = null;
+    fileInput.value = '';
+    showScreen('upload');
 }
 
-// ========== Slide rendering ==========
-function renderSlides(slides) {
-    slidesContainer.innerHTML = '';
-    navDots.innerHTML = '';
-    wrappedScreen.querySelectorAll('.reset-btn, .year-change-btn').forEach(b => b.remove());
-    slideElements = [];
-    chartInitialized = {};
-    totalSlides = slides.length;
-    currentSlide = 0;
-
-    slides.forEach((slide, i) => {
-        const el = document.createElement('div');
-        el.className = `slide ${slide.gradient} ${i === 0 ? 'active' : ''}`;
-        el.innerHTML = slide.html;
-        el.dataset.index = i;
-        el.setAttribute('role', 'group');
-        el.setAttribute('aria-label', `Slide ${i + 1} sur ${slides.length}`);
-        el.setAttribute('aria-hidden', i === 0 ? 'false' : 'true');
-        if (slide.chart) el._chartInit = slide.chart;
-        slidesContainer.appendChild(el);
-        slideElements.push(el);
-
-        const dot = document.createElement('button');
-        dot.className = `nav-dot ${i === 0 ? 'active' : ''}`;
-        dot.setAttribute('aria-label', `Aller a la slide ${i + 1}`);
-        dot.addEventListener('click', () => goToSlide(i));
-        navDots.appendChild(dot);
-    });
-
-    const resetBtn = document.createElement('button');
-    resetBtn.className = 'reset-btn';
-    resetBtn.textContent = 'Nouvelle analyse';
-    resetBtn.setAttribute('aria-label', 'Analyser un autre fichier');
-    resetBtn.addEventListener('click', () => {
-        history.replaceState(null, '', window.location.pathname);
-        sessionStorage.removeItem('ww-stats');
-        currentStats = null;
-        currentComparison = null;
-        currentText = null;
-        availableYears = [];
-        availableYearCounts = {};
-        currentYear = null;
-        slidesContainer.innerHTML = '';
-        navDots.innerHTML = '';
-        wrappedScreen.querySelectorAll('.reset-btn, .year-change-btn').forEach(b => b.remove());
-        slideElements = [];
-        chartInitialized = {};
-        fileInput.value = '';
-        showScreen(uploadScreen);
-    });
-    wrappedScreen.appendChild(resetBtn);
-
-    if (availableYears.length > 1 && currentText) {
-        const yearBtn = document.createElement('button');
-        yearBtn.className = 'year-change-btn';
-        const label = currentYear == null ? 'Toutes les années' : String(currentYear);
-        yearBtn.textContent = `📅 ${label}`;
-        yearBtn.setAttribute('aria-label', 'Changer l\'année analysée');
-        yearBtn.addEventListener('click', async () => {
-            showScreen(uploadScreen);
-            const chosen = await pickYear(availableYears, availableYearCounts);
-            if (chosen === currentYear) { showScreen(wrappedScreen); return; }
-            currentYear = chosen;
-            showScreen(loadingScreen);
-            loadingStatus.textContent = 'Calcul des stats...';
-            try {
-                const result = await callWorker(currentText, currentYear);
-                if (result.kind !== 'stats') throw new Error('Calcul échoué');
-                currentStats = rehydrateDates(result.stats);
-                currentComparison = result.comparison;
-                const newSlides = generateSlides(currentStats, currentComparison);
-                renderSlides(newSlides);
-                showScreen(wrappedScreen);
-            } catch (err) {
-                console.error(err);
-                showError(err.message);
-                showScreen(wrappedScreen);
-            }
-        });
-        wrappedScreen.appendChild(yearBtn);
-    }
-
-    const lastSlide = slideElements[slideElements.length - 1];
-    const analyserBtn = lastSlide.querySelector('.file-btn');
-    if (analyserBtn) {
-        const shareBtn = document.createElement('button');
-        shareBtn.className = 'file-btn';
-        shareBtn.style.cssText = 'margin-top:1rem; margin-right:0.75rem; background:var(--accent-purple);';
-        shareBtn.textContent = 'Partager';
-        shareBtn.addEventListener('click', () => {
-            if (!currentStats) return;
-            const { url, truncated } = buildShareURL(currentStats, currentComparison, { dropDaily: true });
-            copyToClipboard(url, truncated ? 'Lien copié (allégé, conversation volumineuse)' : 'Lien copié !');
-        });
-        analyserBtn.parentNode.insertBefore(shareBtn, analyserBtn);
-    }
-
-    initChartForSlide(0);
-    updateCounter(0);
-    setupNavigation();
-}
-
-function updateCounter(index) {
-    const counter = $('#slide-counter');
-    if (counter) counter.textContent = `${index + 1} / ${totalSlides}`;
-}
-
-function initChartForSlide(index) {
-    if (chartInitialized[index]) return;
-    const el = slideElements[index];
-    if (!el || !el._chartInit) return;
-    const canvas = el.querySelector('canvas');
-    if (canvas) {
-        el._chartInit(canvas.getContext('2d'), el);
-        chartInitialized[index] = true;
-    }
-}
-
-let isAnimating = false;
-function goToSlide(index) {
-    if (index < 0 || index >= totalSlides || index === currentSlide || isAnimating) return;
-    isAnimating = true;
-
-    const goingForward = index > currentSlide;
-    const oldSlide = slideElements[currentSlide];
-    const newSlide = slideElements[index];
-
-    newSlide.style.transition = 'none';
-    newSlide.style.transform = goingForward ? 'translateX(100%)' : 'translateX(-100%)';
-    newSlide.style.opacity = '1';
-    newSlide.classList.add('active');
-    newSlide.setAttribute('aria-hidden', 'false');
-    newSlide.offsetHeight;
-
-    newSlide.style.transition = '';
-    newSlide.style.transform = 'translateX(0)';
-    oldSlide.style.transform = goingForward ? 'translateX(-100%)' : 'translateX(100%)';
-    oldSlide.style.opacity = '0';
-    oldSlide.setAttribute('aria-hidden', 'true');
-
-    setTimeout(() => {
-        oldSlide.classList.remove('active');
-        oldSlide.style.transform = '';
-        oldSlide.style.opacity = '';
-        oldSlide.style.transition = '';
-        currentSlide = index;
-        isAnimating = false;
-    }, 500);
-
-    navDots.querySelectorAll('.nav-dot').forEach((dot, i) => dot.classList.toggle('active', i === index));
-    updateCounter(index);
-    initChartForSlide(index);
-    announce(`Slide ${index + 1} sur ${totalSlides}`);
-    const hint = $('#swipe-hint');
-    if (hint) hint.style.display = 'none';
-}
-
-function setupNavigation() {
-    $('#nav-prev').addEventListener('click', () => goToSlide(currentSlide - 1));
-    $('#nav-next').addEventListener('click', () => goToSlide(currentSlide + 1));
-    document.addEventListener('keydown', (e) => {
-        if (!wrappedScreen.classList.contains('active')) return;
-        if (e.target.closest('input, textarea, button[data-filter]')) return;
-        if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); goToSlide(currentSlide + 1); }
-        else if (e.key === 'ArrowLeft') { e.preventDefault(); goToSlide(currentSlide - 1); }
-        else if (e.key === 'Home') { e.preventDefault(); goToSlide(0); }
-        else if (e.key === 'End') { e.preventDefault(); goToSlide(totalSlides - 1); }
-    });
-
-    let touchStartX = 0, touchStartY = 0;
-    slidesContainer.addEventListener('touchstart', (e) => {
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
-    }, { passive: true });
-    slidesContainer.addEventListener('touchend', (e) => {
-        const dx = e.changedTouches[0].clientX - touchStartX;
-        const dy = e.changedTouches[0].clientY - touchStartY;
-        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
-            if (dx < 0) goToSlide(currentSlide + 1);
-            else goToSlide(currentSlide - 1);
-        }
-    }, { passive: true });
-
-    let wheelTimeout;
-    slidesContainer.addEventListener('wheel', (e) => {
-        if (wheelTimeout) return;
-        wheelTimeout = setTimeout(() => { wheelTimeout = null; }, 800);
-        if (e.deltaY > 30) goToSlide(currentSlide + 1);
-        else if (e.deltaY < -30) goToSlide(currentSlide - 1);
-    }, { passive: true });
-}
-
-// ========== Summary → Dashboard ==========
+// ========== Dashboard hand-off ==========
 $('#summary-btn').addEventListener('click', () => {
-    if (!currentStats) return;
+    if (!session) return;
     try {
-        sessionStorage.setItem('ww-stats', JSON.stringify({
-            stats: serializeStats(currentStats),
-            comparison: currentComparison,
+        sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+            stats: serializeStats(session.stats),
+            comparison: session.comparison,
         }));
-    } catch (e) {
-        console.error('Failed to save stats:', e);
+    } catch (err) {
+        console.error('Failed to save stats:', err);
+        showError('Impossible d\'ouvrir le dashboard (stockage plein ?)');
         return;
     }
     window.location.href = 'dashboard.html';
 });
 
-// ========== Sharing ==========
-function showToast(message) {
-    const toast = $('#share-toast');
-    toast.textContent = message;
-    toast.classList.remove('error');
-    toast.classList.add('visible');
-    setTimeout(() => toast.classList.remove('visible'), 2000);
-}
+// ========== Errors ==========
+/**
+ * A parse failure used to be a 4-second red toast. Now it gets a screen that
+ * says what was actually read, so the user can tell a wrong file from an
+ * unsupported format — and report the latter.
+ */
+function showFatal(message, diagnostics = null) {
+    $('#error-message').textContent = message;
+    const box = $('#error-diagnostics');
 
-function showError(message) {
-    const toast = $('#share-toast');
-    toast.textContent = 'Erreur : ' + message;
-    toast.classList.add('error', 'visible');
-    announce('Erreur : ' + message);
-    setTimeout(() => toast.classList.remove('visible'), 4000);
-}
-
-function copyToClipboard(text, message = 'Lien copié !') {
-    navigator.clipboard.writeText(text).then(() => showToast(message)).catch(() => {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-        showToast(message);
-    });
-}
-
-function tryLoadFromURL() {
-    const hash = window.location.hash;
-    if (!hash.startsWith('#share=')) return false;
-    try {
-        const json = LZString.decompressFromEncodedURIComponent(hash.slice('#share='.length));
-        if (!json) return false;
-        const payload = sanitizeShared(JSON.parse(json));
-        const stats = rehydrateDates(payload.s);
-        currentStats = stats;
-        currentComparison = payload.c || null;
-        const slides = generateSlides(stats, currentComparison);
-        renderSlides(slides);
-        showScreen(wrappedScreen);
-        return true;
-    } catch (e) {
-        console.error('Failed to load shared data:', e);
-        return false;
+    if (diagnostics) {
+        const samples = diagnostics.samples.length
+            ? `<p class="diag-label">Premières lignes non reconnues (contenu masqué) :</p>
+               <ul class="diag-samples">${diagnostics.samples.map(s => `<li><code>${escapeHtml(s)}</code></li>`).join('')}</ul>`
+            : '';
+        box.innerHTML = `
+            <dl class="diag-grid">
+                <div><dt>Lignes lues</dt><dd>${diagnostics.totalLines.toLocaleString('fr-FR')}</dd></div>
+                <div><dt>Format détecté</dt><dd>${diagnostics.detected ? 'oui' : 'non'}</dd></div>
+                <div><dt>Lignes reconnues</dt><dd>${diagnostics.matched}</dd></div>
+            </dl>
+            ${samples}`;
+        box.hidden = false;
+    } else {
+        box.hidden = true;
+        box.innerHTML = '';
     }
+
+    announce(`Erreur : ${message}`);
+    showScreen('error');
 }
 
-function tryLoadFromSession() {
-    try {
-        const raw = sessionStorage.getItem('ww-stats');
-        if (!raw) return false;
-        const payload = JSON.parse(raw);
-        const stats = rehydrateDates(payload.stats);
-        currentStats = stats;
-        currentComparison = payload.comparison || null;
-        const slides = generateSlides(stats, currentComparison);
-        renderSlides(slides);
-        showScreen(wrappedScreen);
+// ========== Restore from URL / session ==========
+async function restore() {
+    // #demo is the manifest shortcut target, and a stable entry point for
+    // linking someone straight to a working example.
+    if (window.location.hash === '#demo') {
+        runDemo();
         return true;
-    } catch (e) {
-        console.error('Failed to load from session:', e);
-        return false;
     }
+    const { share } = readHash();
+    if (share) {
+        try {
+            await ensureLZString();
+            const json = window.LZString.decompressFromEncodedURIComponent(share);
+            if (json) {
+                const payload = sanitizeShared(JSON.parse(json));
+                present(rehydrateDates(payload.s), payload.c || null);
+                return true;
+            }
+        } catch (err) {
+            console.error('Failed to load shared data:', err);
+            showToast('Ce lien de partage est illisible', { error: true });
+        }
+    }
+    try {
+        const raw = sessionStorage.getItem(SESSION_KEY);
+        if (raw) {
+            const payload = JSON.parse(raw);
+            present(rehydrateDates(payload.stats), payload.comparison || null);
+            return true;
+        }
+    } catch (err) {
+        console.error('Failed to load from session:', err);
+    }
+    return false;
 }
 
-if (!tryLoadFromURL()) tryLoadFromSession();
+restore();
+
+function sameRange(a, b) {
+    if (!a || !b) return a === b;
+    return a.from === b.from && a.to === b.to;
+}

@@ -1,12 +1,20 @@
 import { escapeHtml, fmt } from '../utils.js';
 import { CHART_COLORS } from './_constants.js';
-import { rankingBars, monthLabels, cssVar } from './_helpers.js';
+import { rankingBars, monthLabels } from './_helpers.js';
+import { barsFrom } from './_card.js';
+import { makeChart } from './_charts.js';
 
 export function topMessagersSlide(stats, gradient) {
     const top10 = stats.ranking;
     const maxCount = top10[0]?.[1].count || 1;
     return {
         gradient,
+        card: {
+            gradient,
+            tag: 'Classement',
+            title: 'Les plus bavard·e·s',
+            bars: barsFrom(top10, r => r[1].count, r => `${fmt(r[1].count)} · ${r[1].percent}%`),
+        },
         html: `
             <div class="slide-inner">
                 <span class="slide-tag">Classement</span>
@@ -35,12 +43,12 @@ export function pieSlide(stats, gradient) {
             const labels = topN.map(r => r[0]);
             const data = topN.map(r => r[1].count);
             if (othersCount > 0) { labels.push('Autres'); data.push(othersCount); }
-            new Chart(ctx, {
+            makeChart(ctx, {
                 type: 'doughnut',
                 data: { labels, datasets: [{ data, backgroundColor: CHART_COLORS.slice(0, labels.length), borderWidth: 2, borderColor: 'rgba(0,0,0,0.3)' }] },
                 options: {
                     responsive: true, maintainAspectRatio: true,
-                    plugins: { legend: { position: 'bottom', labels: { color: cssVar('--text-primary'), padding: 12, font: { size: 11 } } } },
+                    plugins: { legend: { position: 'bottom', labels: { color: 'var(--text-primary)', padding: 12, font: { size: 11 } } } },
                     cutout: '55%',
                 },
             });
@@ -87,15 +95,15 @@ export function evolutionPerPersonSlide(stats, gradient) {
                 });
             }
 
-            const chart = new Chart(canvas.getContext('2d'), {
+            const chart = makeChart(canvas.getContext('2d'), {
                 type: 'line',
                 data: { labels, datasets: makeDatasets('__all__') },
                 options: {
                     responsive: true, interaction: { mode: 'index', intersect: false },
-                    plugins: { legend: { display: true, position: 'bottom', labels: { color: cssVar('--text-secondary'), padding: 8, font: { size: 9 }, boxWidth: 10 } } },
+                    plugins: { legend: { display: true, position: 'bottom', labels: { color: 'var(--text-secondary)', padding: 8, font: { size: 9 }, boxWidth: 10 } } },
                     scales: {
-                        x: { ticks: { color: cssVar('--text-muted'), font: { size: 9 } }, grid: { display: false } },
-                        y: { ticks: { color: cssVar('--text-muted') }, grid: { color: cssVar('--grid-line') }, beginAtZero: true },
+                        x: { ticks: { color: 'var(--text-muted)', font: { size: 9 } }, grid: { display: false } },
+                        y: { ticks: { color: 'var(--text-muted)' }, grid: { color: 'var(--grid-line)' }, beginAtZero: true },
                     },
                 },
             });
@@ -119,10 +127,17 @@ export function messageLengthSlide(stats, gradient) {
     const maxAvgLen = avgLenRanking[0]?.[1].avgLen || 1;
     return {
         gradient,
+        card: {
+            gradient,
+            tag: 'Longueur',
+            title: 'Qui écrit les plus longs messages ?',
+            subtitle: 'Longueur moyenne par message, en caractères',
+            bars: barsFrom(avgLenRanking, r => r[1].avgLen, r => `${r[1].avgLen} car.`),
+        },
         html: `
             <div class="slide-inner">
                 <span class="slide-tag">Longueur</span>
-                <h2 class="slide-title">Qui ecrit les plus longs messages ?</h2>
+                <h2 class="slide-title">Qui écrit les plus longs messages ?</h2>
                 <p class="slide-subtitle">Longueur moyenne par message (en caractères)</p>
                 <div class="ranking-list">${rankingBars(avgLenRanking, r => r[1].avgLen, r => `${r[1].avgLen} car.`, maxAvgLen)}</div>
             </div>
@@ -150,11 +165,18 @@ export function initiatorSlide(stats, gradient) {
     }).join('');
     return {
         gradient,
+        card: {
+            gradient,
+            tag: 'Initiative',
+            title: 'Qui lance la conversation ?',
+            subtitle: 'Jours où cette personne a envoyé le premier message',
+            bars: barsFrom(stats.initiator, e => e[1], e => `${e[1]} jours`),
+        },
         html: `
             <div class="slide-inner">
                 <span class="slide-tag">Initiative</span>
                 <h2 class="slide-title">Qui lance la conversation ?</h2>
-                <p class="slide-subtitle">Nombre de jours ou cette personne a envoyé le premier message</p>
+                <p class="slide-subtitle">Nombre de jours où cette personne a envoyé le premier message</p>
                 <div class="ranking-list">${bars}</div>
             </div>
         `,

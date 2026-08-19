@@ -43,7 +43,7 @@ jobs:
         run: |
           mkdir dist
           cp index.html dashboard.html manifest.json favicon.svg sw.js dist/
-          cp -r css js dist/
+          cp -r css js fonts icons dist/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

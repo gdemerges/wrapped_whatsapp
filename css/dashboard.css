@@ -39,7 +39,7 @@ html:has(.dashboard-body) body {
 }
 
 .dash-title {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: var(--font-display);
     font-size: 1.2rem;
     font-weight: 900;
     letter-spacing: -0.5px;
@@ -511,3 +511,51 @@ html:has(.dashboard-body) body {
 :root[data-theme="light"] .dash-table tbody tr:hover {
     background: rgba(15, 23, 42, 0.04);
 }
+
+/* ---- Header tools: filter + exports ---- */
+.dash-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.dash-filter select {
+    padding: 0.45rem 0.7rem;
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    border-radius: 50px;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    max-width: 10rem;
+}
+.dash-filter select:disabled { opacity: 0.5; cursor: default; }
+
+@media (max-width: 760px) {
+    .dash-header { flex-wrap: wrap; }
+    .dash-title { order: -1; flex: 1 0 100%; text-align: left; }
+    .dash-tools { flex: 1; }
+    /* The word labels go first; the icons stay tappable. */
+    .dash-action span:not([aria-hidden]) { display: none; }
+    .dash-action { padding: 0.45rem 0.65rem; }
+}
+
+/* A filtered dashboard must look filtered — otherwise a hidden row reads as
+   missing data. */
+body.is-filtered .dash-card:has(tr[data-person]) {
+    outline: 1px solid var(--accent-green);
+    outline-offset: -1px;
+}
+body.is-filtered .dash-card:has(tr[data-person]) > h2::after {
+    content: ' · filtré';
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent-green);
+}
+
+/* ---- New cards ---- */
+.dash-subheading { margin-top: 1.1rem; }

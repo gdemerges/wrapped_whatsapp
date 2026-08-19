@@ -1,5 +1,6 @@
 import { escapeHtml, fmt } from '../utils.js';
 import { CHART_COLORS } from './_constants.js';
+import { barsFrom } from './_card.js';
 
 export function emojiSlide(stats, gradient) {
     const items = stats.emojis.top.slice(0, 12).map(([emoji, count]) =>
@@ -7,6 +8,13 @@ export function emojiSlide(stats, gradient) {
     ).join('');
     return {
         gradient,
+        card: {
+            gradient,
+            tag: 'Emojis',
+            big: { value: fmt(stats.emojis.total), label: 'emojis envoyés' },
+            subtitle: `${stats.emojis.unique} emojis différents utilisés`,
+            emojis: stats.emojis.top.slice(0, 10),
+        },
         html: `
             <div class="slide-inner">
                 <span class="slide-tag">Emojis</span>
@@ -29,9 +37,15 @@ export function reactionsSlide(stats, gradient) {
     ).join('');
     return {
         gradient,
+        card: {
+            gradient,
+            tag: 'Réactions',
+            big: { value: fmt(stats.reactions.total), label: 'réactions envoyées' },
+            emojis: stats.reactions.topEmojis.slice(0, 10),
+        },
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Reactions</span>
+                <span class="slide-tag">Réactions</span>
                 <div class="big-number">${fmt(stats.reactions.total)}</div>
                 <div class="big-label">réactions envoyées</div>
                 <div class="emoji-grid">${top}</div>
@@ -61,6 +75,12 @@ export function emojisPerPersonSlide(stats, gradient) {
     }).join('');
     return {
         gradient,
+        card: {
+            gradient,
+            tag: 'Emojis',
+            title: "Les fans d'emojis",
+            bars: barsFrom(stats.emojis.perPerson, e => e[1], e => fmt(e[1])),
+        },
         html: `
             <div class="slide-inner">
                 <span class="slide-tag">Emojis</span>

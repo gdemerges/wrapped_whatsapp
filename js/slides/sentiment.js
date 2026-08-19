@@ -1,6 +1,7 @@
 import { escapeHtml } from '../utils.js';
 import { CHART_COLORS } from './_constants.js';
-import { monthLabels, cssVar } from './_helpers.js';
+import { monthLabels } from './_helpers.js';
+import { makeChart } from './_charts.js';
 
 export function ambianceSlide(stats, gradient) {
     const st = stats.sentiment;
@@ -83,7 +84,7 @@ export function sentimentTimelineSlide(stats, gradient) {
                     spanGaps: true,
                 });
             });
-            new Chart(canvas.getContext('2d'), {
+            makeChart(canvas.getContext('2d'), {
                 type: 'line',
                 data: { labels, datasets },
                 options: {
@@ -93,14 +94,14 @@ export function sentimentTimelineSlide(stats, gradient) {
                         legend: {
                             display: authors.length <= 5,
                             position: 'bottom',
-                            labels: { color: cssVar('--text-secondary'), padding: 8, font: { size: 9 }, boxWidth: 10 },
+                            labels: { color: 'var(--text-secondary)', padding: 8, font: { size: 9 }, boxWidth: 10 },
                         },
                     },
                     scales: {
-                        x: { ticks: { color: cssVar('--text-muted'), font: { size: 9 }, maxRotation: 45 }, grid: { display: false } },
+                        x: { ticks: { color: 'var(--text-muted)', font: { size: 9 }, maxRotation: 45 }, grid: { display: false } },
                         y: {
-                            ticks: { color: cssVar('--text-muted'), callback: v => `${v > 0 ? '+' : ''}${v}%` },
-                            grid: { color: cssVar('--grid-line') },
+                            ticks: { color: 'var(--text-muted)', callback: v => `${v > 0 ? '+' : ''}${v}%` },
+                            grid: { color: 'var(--grid-line)' },
                         },
                     },
                 },
@@ -139,15 +140,15 @@ export function moodHourlySlide(stats, gradient) {
                 const alpha = 0.3 + Math.min(0.7, Math.abs(v) / 80);
                 return v >= 0 ? `rgba(16,185,129,${alpha})` : `rgba(239,68,68,${alpha})`;
             });
-            new Chart(canvas.getContext('2d'), {
+            makeChart(canvas.getContext('2d'), {
                 type: 'bar',
                 data: { labels, datasets: [{ data, backgroundColor: bgColors, borderRadius: 3 }] },
                 options: {
                     responsive: true,
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { ticks: { color: cssVar('--text-muted'), font: { size: 9 } }, grid: { display: false } },
-                        y: { ticks: { color: cssVar('--text-muted'), callback: v => `${v > 0 ? '+' : ''}${v}%` }, grid: { color: cssVar('--grid-line') } },
+                        x: { ticks: { color: 'var(--text-muted)', font: { size: 9 } }, grid: { display: false } },
+                        y: { ticks: { color: 'var(--text-muted)', callback: v => `${v > 0 ? '+' : ''}${v}%` }, grid: { color: 'var(--grid-line)' } },
                     },
                 },
             });

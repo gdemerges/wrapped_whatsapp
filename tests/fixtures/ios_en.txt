@@ -1,0 +1,4 @@
+[15/03/2024, 2:30:00 PM] Alice: Hey, how are you?
+[15/03/2024, 2:31:10 PM] Bob: All good! You?
+[15/03/2024, 2:32:05 PM] Alice: image omitted
+[15/03/2024, 11:45:00 PM] Bob: Talk tomorrow

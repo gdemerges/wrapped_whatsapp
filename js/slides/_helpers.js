@@ -17,15 +17,6 @@ export function rankingBars(items, valueFn, labelFn, max) {
     }).join('');
 }
 
-/**
- * Resolve a CSS custom property to its concrete value.
- * Chart.js draws on canvas, which does not understand `var(--x)` strings —
- * passing them makes it silently fall back to its default color.
- */
-export function cssVar(name) {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888';
-}
-
 export function monthLabels(monthKeys) {
     return monthKeys.map(m => {
         const [y, mo] = m.split('-');

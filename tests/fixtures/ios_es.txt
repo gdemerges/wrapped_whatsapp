@@ -1,0 +1,4 @@
+[15/03/2024, 14:30:00] Ana: Hola a todos
+[15/03/2024, 14:31:10] Bruno: ¡Qué tal!
+[16/03/2024, 09:05:00] Ana: imagen omitida
+[17/03/2024, 21:15:00] Bruno: Hasta mañana
