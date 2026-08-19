@@ -36,6 +36,7 @@ export default [
                 Image: 'readonly',
                 CustomEvent: 'readonly',
                 HTMLElement: 'readonly',
+                fetch: 'readonly',
                 matchMedia: 'readonly',
             },
         },

@@ -15,6 +15,7 @@ import { shareCard, buildPosterCard } from '../export-image.js';
 import { resolvePreset } from '../export-presets.js';
 import { ensureLZString } from '../vendor.js';
 import { showToast, showError } from './toast.js';
+import { track } from '../analytics.js';
 
 const ANON_KEY = 'ww-anonymize-share';
 const POSTER_KEY = 'ww-poster-format';
@@ -108,10 +109,12 @@ export function openShareSheet({ stats, comparison, card, recapCard }) {
                                 `whatsapp-wrapped-poster-${format}.png`,
                                 { preset: format },
                             );
+                            track('poster', { format });
                             showToast(result === 'shared' ? 'Poster partagé' : 'Poster enregistré');
                         } else {
                             const chosen = action === 'recap' ? recapCard : card;
                             const result = await shareCard(chosen, filenameFor(chosen));
+                            track('share_image', { kind: action });
                             showToast(result === 'shared' ? 'Image partagée' : 'Image enregistrée');
                         }
                         close(action);
@@ -129,6 +132,7 @@ export function openShareSheet({ stats, comparison, card, recapCard }) {
 }
 
 async function copyLink(stats, comparison, anonymize) {
+    track('share_link', { anonymized: anonymize });
     await ensureLZString();
     const payload = anonymize ? anonymizeStats(stats) : stats;
     const { url, truncated } = buildShareURL(payload, comparison, { dropDaily: true });

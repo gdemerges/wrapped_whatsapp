@@ -30,6 +30,8 @@ Vitest pour les tests, ESLint pour le lint.
 | `js/export-presets.js` | Formats de sortie, calcul dpi→pixels, carte du poster |
 | `js/anonymize.js` | Remplacement des prénoms par des initiales |
 | `js/vendor.js` | Chargement paresseux des scripts CDN (SRI épinglé) |
+| `js/config.js` | Cagnotte et mesure d'audience — vide par défaut |
+| `js/analytics.js` | Compteur d'usage anonyme, inerte tant que non configuré |
 | `js/ui/` | Dialogues, toasts, feuille de partage, gestion du hash |
 | `js/dashboard.js` | Vue tableau de bord |
 | `js/lang/` | Données de langue (stopwords, sentiment) |
@@ -50,6 +52,9 @@ Vitest pour les tests, ESLint pour le lint.
   un poster A3 est le même code de dessin qu'une story. Tout nouveau format doit rester sous
   `MAX_CANVAS_PIXELS` (iOS rend une image vide, sans erreur, au-delà).
 - **Le worker garde les messages** ; le thread principal ne détient jamais le texte du chat.
+- **La mesure d'audience** ne transmet jamais rien qui vienne d'une conversation, pas même un
+  compte agrégé, et jamais l'URL complète (le fragment `#share=` contient les statistiques).
+  Un nouvel événement se déclare dans `js/analytics.js` et se documente dans le README.
 - **Le partage par lien** doit rester anonymisable : toute nouvelle statistique portant un nom
   de personne doit survivre au parcours générique de `anonymize.js` (clé *ou* valeur).
 

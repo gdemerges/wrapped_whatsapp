@@ -2174,3 +2174,40 @@ body.story-playing .progress-seg.current .progress-fill { width: 0; }
 .share-action-go:disabled { opacity: 0.55; cursor: progress; }
 :root[data-theme="light"] .share-action-go { background: #0f766e; color: #fff; }
 
+
+/* ---- Privacy note extras + tip jar ---- */
+.privacy-note-extra {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 0.78rem;
+    opacity: 0.85;
+}
+
+.link-btn {
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--accent-green);
+    font: inherit;
+    font-size: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}
+:root[data-theme="light"] .link-btn { color: #0f766e; }
+
+.tip-link {
+    display: inline-block;
+    margin-top: 1.25rem;
+    padding: 0.55rem 1.1rem;
+    border: 1px solid var(--surface-border);
+    border-radius: 999px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    text-decoration: none;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.tip-link:hover {
+    background: var(--surface);
+    color: var(--text-primary);
+    border-color: var(--accent-green);
+}

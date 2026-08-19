@@ -10,6 +10,7 @@ import { openShareSheet } from './ui/share.js';
 import { showToast, showError } from './ui/toast.js';
 import { downloadBlob } from './export-image.js';
 import { readHash } from './ui/hash.js';
+import { track, trackPageview } from './analytics.js';
 
 function fmtClock(date) {
     const d = date instanceof Date ? date : new Date(date);
@@ -51,6 +52,7 @@ function applyLabel(btn, theme) {
 /** @type {{ stats: any, comparison: any } | null} */
 let current = null;
 
+trackPageview();
 boot();
 
 async function boot() {
@@ -524,6 +526,7 @@ function exportJSON() {
     if (!current) return;
     const blob = new Blob([JSON.stringify(current.stats, null, 2)], { type: 'application/json' });
     downloadBlob(blob, 'whatsapp-wrapped-stats.json');
+    track('export', { format: 'json' });
     showToast('Stats exportées en JSON');
 }
 
@@ -552,6 +555,7 @@ function exportCSV() {
     // BOM so Excel opens UTF-8 accents correctly.
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
     downloadBlob(blob, 'whatsapp-wrapped-participants.csv');
+    track('export', { format: 'csv' });
     showToast('Stats exportées en CSV');
 }
 

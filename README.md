@@ -80,6 +80,41 @@ Deux nuances à connaître :
   télécharge les modèles depuis un CDN (~50 Mo). Sans elle, l'ambiance est déduite localement
   des réactions emoji et d'un lexique — aucun téléchargement.
 
+## Configuration du déploiement
+
+Tout est optionnel et **vide par défaut** : le site ne fait aucune requête sortante tant que
+`js/config.js` n'est pas renseigné. Un fork ne se met donc jamais à téléphoner tout seul.
+
+### Cagnotte
+
+```js
+export const TIP_JAR_URL = 'https://ko-fi.com/ton-compte';
+```
+
+Le lien de soutien n'apparaît que si cette valeur est renseignée.
+
+### Mesure d'audience
+
+```js
+export const ANALYTICS = {
+    provider: 'plausible',              // ou 'umami'
+    host: 'https://stats.exemple.fr',   // ton instance auto-hébergée
+    site: 'exemple.fr',                 // domaine (Plausible) ou id (Umami)
+};
+```
+
+⚠️ **Il faut aussi ajouter `host` à `connect-src`** dans la CSP de `index.html` *et* de
+`dashboard.html`, sinon toutes les requêtes sont bloquées et le compteur n'enregistre rien.
+
+Ce qui est envoyé, et rien d'autre : le nom de l'événement (`pageview`, `analysis`, `poster`,
+`share_link`, `share_image`, `export`, `dashboard`, `parse_error`) et quelques propriétés
+techniques (format du poster, lien anonymisé ou non). **Aucune valeur issue d'une conversation** —
+ni le nombre de messages, ni le nombre de participants. L'URL est réduite à son chemin : le
+fragment `#share=…` contient les statistiques et ne doit jamais atteindre un endpoint.
+
+Le compteur respecte Do Not Track, Global Privacy Control et un refus local, et la note de
+confidentialité de la page d'accueil s'adapte automatiquement à l'état réel.
+
 ## Lancer en local
 
 Aucun outil de build nécessaire. Il suffit d'un serveur web statique :

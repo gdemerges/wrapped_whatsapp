@@ -15,6 +15,8 @@ import { readHash, clearHash } from './ui/hash.js';
 import { ensureJSZip, ensureLZString, preload } from './vendor.js';
 import { buildDemoBlob } from './demo.js';
 import { escapeHtml } from './utils.js';
+import { TIP_JAR_URL } from './config.js';
+import { track, trackPageview, isEnabled as analyticsEnabled, isOptedOut, setOptOut } from './analytics.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -242,6 +244,8 @@ async function computeAndShow() {
 
     sessionStorage.removeItem(SESSION_KEY); // drop stats from a previous analysis
     present(rehydrateDates(result.stats), result.comparison);
+    // Only *that* an analysis happened, never anything about the conversation.
+    track('analysis', { ai: useAI(), period: period.range ? 'range' : (period.year == null ? 'all' : 'year') });
 }
 
 async function unzip(file) {
@@ -374,6 +378,7 @@ function resetAll() {
 // ========== Dashboard hand-off ==========
 $('#summary-btn').addEventListener('click', () => {
     if (!session) return;
+    track('dashboard');
     try {
         sessionStorage.setItem(SESSION_KEY, JSON.stringify({
             stats: serializeStats(session.stats),
@@ -394,6 +399,7 @@ $('#summary-btn').addEventListener('click', () => {
  * unsupported format — and report the latter.
  */
 function showFatal(message, diagnostics = null) {
+    track('parse_error', { detected: Boolean(diagnostics?.detected) });
     $('#error-message').textContent = message;
     const box = $('#error-diagnostics');
 
@@ -455,7 +461,69 @@ async function restore() {
     return false;
 }
 
+renderPrivacyNote();
+renderTipJar();
+trackPageview();
 restore();
+
+/**
+ * The note has to stay true in both states: claiming "rien n'est envoyé à un
+ * serveur" while a usage counter is running would be a lie, so the sentence
+ * about the counter appears exactly when the counter does.
+ */
+function renderPrivacyNote() {
+    const note = $('.privacy-note');
+    if (!note) return;
+
+    const base = 'Tes données restent sur ton appareil. Ta conversation n\'est jamais envoyée : '
+        + 'elle est lue et analysée dans ce navigateur.';
+
+    if (!analyticsEnabled() && !isOptedOut()) {
+        note.textContent = base;
+        return;
+    }
+    note.textContent = '';
+    note.append(base + ' ');
+
+    const extra = document.createElement('span');
+    extra.className = 'privacy-note-extra';
+    if (isOptedOut()) {
+        extra.append('Mesure d\'audience désactivée. ');
+        extra.append(makeToggle('Réactiver', false));
+    } else {
+        extra.append('Un compteur anonyme enregistre les fonctionnalités utilisées — jamais le contenu de tes messages. ');
+        extra.append(makeToggle('Ne pas participer', true));
+    }
+    note.append(extra);
+}
+
+function makeToggle(label, optOut) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'link-btn';
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+        setOptOut(optOut);
+        renderPrivacyNote();
+        showToast(optOut ? 'Mesure d\'audience désactivée' : 'Mesure d\'audience réactivée');
+    });
+    return btn;
+}
+
+/** Support links appear only once a tip jar URL is configured. */
+function renderTipJar() {
+    if (!TIP_JAR_URL) return;
+    const host = $('.upload-container');
+    if (!host) return;
+    const link = document.createElement('a');
+    link.className = 'tip-link';
+    link.href = TIP_JAR_URL;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = '☕ Ce site est gratuit — offrir un café';
+    link.addEventListener('click', () => track('tip_jar'));
+    host.appendChild(link);
+}
 
 function sameRange(a, b) {
     if (!a || !b) return a === b;
