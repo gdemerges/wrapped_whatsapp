@@ -26,7 +26,8 @@ Vitest pour les tests, ESLint pour le lint.
 | `js/parser.js` | Parsing des exports WhatsApp (iOS / Android, FR / EN / ES / DE) |
 | `js/stats.js` | Calcul de toutes les statistiques |
 | `js/slides/` | Une slide par fichier ; `index.js` compose le deck |
-| `js/export-image.js` | Rendu canvas des images partageables 1080×1920 |
+| `js/export-image.js` | Rendu canvas des images partageables (story et poster) |
+| `js/export-presets.js` | Formats de sortie, calcul dpi→pixels, carte du poster |
 | `js/anonymize.js` | Remplacement des prénoms par des initiales |
 | `js/vendor.js` | Chargement paresseux des scripts CDN (SRI épinglé) |
 | `js/ui/` | Dialogues, toasts, feuille de partage, gestion du hash |
@@ -44,6 +45,10 @@ Vitest pour les tests, ESLint pour le lint.
   - `chart` reçoit `(ctx, slideEl)` et doit passer par `makeChart` de `js/slides/_charts.js`,
     jamais `new Chart` : le registre gère la destruction et la recoloration au changement de
     thème. Les couleurs de thème s'écrivent `'var(--token)'` dans la config.
+- **L'export image** est dessiné en *unités de design* : la largeur vaut toujours 1080, le
+  preset fixe l'échelle et le rapport d'aspect. Ne jamais coder une taille en pixels réels —
+  un poster A3 est le même code de dessin qu'une story. Tout nouveau format doit rester sous
+  `MAX_CANVAS_PIXELS` (iOS rend une image vide, sans erreur, au-delà).
 - **Le worker garde les messages** ; le thread principal ne détient jamais le texte du chat.
 - **Le partage par lien** doit rester anonymisable : toute nouvelle statistique portant un nom
   de personne doit survivre au parcours générique de `anonymize.js` (clé *ou* valeur).

@@ -2123,3 +2123,54 @@ body.story-playing .progress-seg.current .progress-fill { width: 0; }
     transform: translateX(-50%) translateY(20px);
 }
 .share-toast.visible { transform: translateX(-50%) translateY(0); }
+
+/* ---- Share sheet: the poster row carries its own format picker ---- */
+.share-action-compound {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+        "icon body"
+        "..   controls";
+    align-items: center;
+    gap: 0.6rem 0.75rem;
+    cursor: default;
+}
+.share-action-compound > .share-action-icon { grid-area: icon; align-self: start; }
+.share-action-body { grid-area: body; min-width: 0; }
+.share-action-controls {
+    grid-area: controls;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+.share-action-body strong { display: block; font-size: 0.95rem; }
+.share-action-body small { display: block; margin-top: 0.15rem; color: var(--text-muted); font-size: 0.75rem; }
+
+.share-action-select select {
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--surface-border);
+    border-radius: 10px;
+    background: var(--panel-bg);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.share-action-go {
+    flex: 0 0 auto;
+    padding: 0.45rem 0.8rem;
+    border: none;
+    border-radius: 999px;
+    background: var(--accent-green);
+    color: #04140a;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+.share-action-go:disabled { opacity: 0.55; cursor: progress; }
+:root[data-theme="light"] .share-action-go { background: #0f766e; color: #fff; }
+

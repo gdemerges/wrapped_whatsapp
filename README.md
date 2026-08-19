@@ -11,6 +11,7 @@ Analyse tes conversations WhatsApp et génère une présentation animée à la f
 - **~30 slides animées** : classements, graphiques, heatmaps, anecdotes
 - **Lecture automatique** : mode story avec barre de progression, comme sur Instagram
 - **Export image** : chaque slide s'enregistre en PNG 1080×1920, prêt à publier
+- **Poster imprimable** : le récapitulatif en A3 ou A4 haute résolution, prêt pour l'imprimeur
 - **Anonymisation** : les prénoms peuvent être remplacés par des initiales avant tout partage
 - **Période libre** : une année, tout l'historique, ou une plage de dates au choix
 - **Dashboard** : vue tableau détaillée, filtre par participant, export CSV / JSON
@@ -42,7 +43,27 @@ génère une conversation fictive pour explorer le site.
 | Première / dernière slide | **Début** / **Fin** |
 | Lecture automatique | **Espace**, ou le bouton *Lecture auto* |
 | Aller à une slide | clic sur la barre de progression en haut |
-| Partager | bouton *Partager* : image de la slide, image du récap, ou lien |
+| Partager | bouton *Partager* : image de la slide, image du récap, poster, ou lien |
+
+### 4. Imprimer le poster
+
+Le bouton *Partager → Poster à imprimer* génère un PNG destiné à l'impression :
+
+| Format | Dimensions | Résolution |
+|---|---|---|
+| A3 | 2923 × 4134 px | 250 dpi |
+| A4 | 2480 × 3508 px | 300 dpi |
+
+Le fichier se dépose tel quel chez n'importe quel imprimeur. Deux détails utiles :
+
+- **Marges** : le contenu reste à ~17 mm des bords, donc au-delà de toute zone de rognage
+  courante. Le fond est un dégradé plein cadre : pas besoin d'ajouter du fond perdu.
+- **Colorimétrie** : le PNG est en sRGB (un canvas ne produit pas de CMJN). Les imprimeurs
+  convertissent, mais les violets saturés peuvent légèrement s'assombrir.
+
+L'A3 est volontairement à 250 dpi plutôt que 300 : à 300 dpi, l'image dépasse la taille de
+canvas qu'iOS accepte d'allouer — et iOS échoue *silencieusement*, en rendant une image
+vide. À distance de bras sur un mur, l'écart est invisible.
 
 ## Vie privée
 

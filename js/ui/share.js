@@ -11,17 +11,21 @@
 import { openDialog } from './dialog.js';
 import { buildShareURL } from '../payload.js';
 import { anonymizeStats } from '../anonymize.js';
-import { shareCard } from '../export-image.js';
+import { shareCard, buildPosterCard } from '../export-image.js';
+import { resolvePreset } from '../export-presets.js';
 import { ensureLZString } from '../vendor.js';
 import { showToast, showError } from './toast.js';
 
 const ANON_KEY = 'ww-anonymize-share';
+const POSTER_KEY = 'ww-poster-format';
 
 /**
  * @param {{ stats: any, comparison: any, card: any|null, recapCard: any|null }} ctx
  */
 export function openShareSheet({ stats, comparison, card, recapCard }) {
     const anonDefault = localStorage.getItem(ANON_KEY) !== 'false';
+    const posterFormat = localStorage.getItem(POSTER_KEY) || 'a3';
+    const posterMeta = resolvePreset(posterFormat);
 
     const html = `
         <div class="dialog-panel share-panel">
@@ -36,6 +40,23 @@ export function openShareSheet({ stats, comparison, card, recapCard }) {
                     <span class="share-action-icon" aria-hidden="true">🧾</span>
                     <span><strong>Image du récapitulatif</strong><small>Les chiffres clés en une image</small></span>
                 </button>` : ''}
+                ${stats ? `<div class="share-action share-action-compound">
+                    <span class="share-action-icon" aria-hidden="true">🖨️</span>
+                    <span class="share-action-body">
+                        <strong>Poster à imprimer</strong>
+                        <small id="poster-meta">${posterMeta.dpi} dpi · ${posterMeta.widthPx}×${posterMeta.heightPx} px</small>
+                    </span>
+                    <span class="share-action-controls">
+                        <label class="share-action-select">
+                            <span class="sr-only">Format du poster</span>
+                            <select id="poster-format">
+                                <option value="a3" ${posterFormat === 'a3' ? 'selected' : ''}>A3</option>
+                                <option value="a4" ${posterFormat === 'a4' ? 'selected' : ''}>A4</option>
+                            </select>
+                        </label>
+                        <button class="share-action-go" data-action="poster" aria-label="Générer le poster">Générer</button>
+                    </span>
+                </div>` : ''}
                 <button class="share-action" data-action="link">
                     <span class="share-action-icon" aria-hidden="true">🔗</span>
                     <span><strong>Copier un lien</strong><small>Les stats sont encodées dans le lien</small></span>
@@ -45,8 +66,9 @@ export function openShareSheet({ stats, comparison, card, recapCard }) {
             <label class="switch-row">
                 <input type="checkbox" id="share-anon" ${anonDefault ? 'checked' : ''}>
                 <span>
-                    <strong>Anonymiser les prénoms</strong>
-                    <small>Camille devient « A. » — recommandé pour un lien public</small>
+                    <strong>Anonymiser les prénoms dans le lien</strong>
+                    <small>Camille devient « A. ». Ne concerne que le lien : une image
+                    montre exactement ce qu'elle montre.</small>
                 </span>
             </label>
 
@@ -63,6 +85,14 @@ export function openShareSheet({ stats, comparison, card, recapCard }) {
                 localStorage.setItem(ANON_KEY, String(anonBox.checked));
             });
 
+            const formatSelect = root.querySelector('#poster-format');
+            formatSelect?.addEventListener('change', () => {
+                localStorage.setItem(POSTER_KEY, formatSelect.value);
+                const meta = resolvePreset(formatSelect.value);
+                root.querySelector('#poster-meta').textContent =
+                    `${meta.dpi} dpi · ${meta.widthPx}×${meta.heightPx} px`;
+            });
+
             root.querySelectorAll('[data-action]').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     const action = btn.dataset.action;
@@ -70,6 +100,15 @@ export function openShareSheet({ stats, comparison, card, recapCard }) {
                     try {
                         if (action === 'link') {
                             await copyLink(stats, comparison, anonBox.checked);
+                        } else if (action === 'poster') {
+                            const format = formatSelect?.value || 'a3';
+                            showToast('Génération du poster…');
+                            const result = await shareCard(
+                                buildPosterCard(stats),
+                                `whatsapp-wrapped-poster-${format}.png`,
+                                { preset: format },
+                            );
+                            showToast(result === 'shared' ? 'Poster partagé' : 'Poster enregistré');
                         } else {
                             const chosen = action === 'recap' ? recapCard : card;
                             const result = await shareCard(chosen, filenameFor(chosen));

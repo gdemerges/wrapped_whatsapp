@@ -1,5 +1,5 @@
 /**
- * Renders a slide as a shareable 1080x1920 image, on canvas.
+ * Renders a card to an image, on canvas — for a story, or for print.
  *
  * This is the piece that makes a "Wrapped" shareable at all: before it, the
  * only way to pass results on was a link carrying the conversation's stats —
@@ -8,10 +8,19 @@
  * Slides describe *what* to export via an optional `card` descriptor (see
  * `js/slides/_card.js`); this module owns *how* it looks. Nothing here reads
  * the DOM, so the output is identical whatever the viewport.
+ *
+ * Everything is laid out in **design units**: the canvas is always 1080 units
+ * wide, and the context is scaled to the preset's real pixel width. A print
+ * poster is therefore the same drawing code as a story, at 2480 px wide and a
+ * shorter aspect ratio — not a separate layout.
  */
 
-const W = 1080;
-const H = 1920;
+import { resolvePreset, buildPosterCard } from './export-presets.js';
+
+export { buildPosterCard };
+
+/** Design-unit width. Every size and offset below is expressed against this. */
+const BASE_W = 1080;
 const PAD = 88;
 
 /** Canvas can't read `var(--x)`, and the story card has its own palette. */
@@ -33,6 +42,12 @@ const DEFAULT_PALETTE = PALETTES['slide-gradient-1'];
 const DISPLAY = "'Space Grotesk', system-ui, -apple-system, sans-serif";
 const BODY = "system-ui, -apple-system, 'Segoe UI', sans-serif";
 
+/** Below this the type stops being a poster and starts being a leaflet. */
+const MIN_CONTENT_SCALE = 0.62;
+
+/** Height reserved at the bottom for the footer line. */
+const FOOTER_BAND = 70;
+
 /** The display face must be resident before the first canvas draw. */
 async function readyFonts() {
     if (!document.fonts) return;
@@ -47,42 +62,83 @@ async function readyFonts() {
 
 /**
  * @param {import('./types.d.ts').SlideCard} card
+ * @param {{ preset?: string }} [options]
  * @returns {Promise<HTMLCanvasElement>}
  */
-export async function renderCard(card) {
+export async function renderCard(card, options = {}) {
     await readyFonts();
 
+    const preset = resolvePreset(options.preset || 'story');
+    const scale = preset.widthPx / BASE_W;
+    const H = preset.heightPx / scale;   // design-unit height, varies by format
+
     const canvas = document.createElement('canvas');
-    canvas.width = W;
-    canvas.height = H;
+    canvas.width = preset.widthPx;
+    canvas.height = preset.heightPx;
     const ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
 
-    paintBackground(ctx, PALETTES[card.gradient] || DEFAULT_PALETTE);
+    const layout = { w: BASE_W, h: H, pad: PAD };
+    paintBackground(ctx, layout, PALETTES[card.gradient] || DEFAULT_PALETTE);
 
-    // Centre the content block rather than pinning it to the top: a card with
-    // four bars was leaving two thirds of a story frame empty.
-    const estimated = estimateHeight(ctx, card);
-    let y = Math.max(PAD + 60, Math.min((H - estimated) / 2, H * 0.34));
-    y = drawTag(ctx, card.tag, y);
-    if (card.title) y = drawTitle(ctx, card.title, y + 28);
-    if (card.subtitle) y = drawSubtitle(ctx, card.subtitle, y + 18);
+    // A poster carries more blocks than a story and has proportionally less
+    // height for them. Rather than dropping content, the whole block is scaled
+    // to fit — which is what makes one card descriptor work in both formats.
+    //
+    // The box stops short of the footer band: the fit used to be computed
+    // against the full height, so a dense poster ran its last row of tiles
+    // straight through the footer.
+    const boxTop = PAD + 40;
+    const boxBottom = H - PAD - FOOTER_BAND;
+    const available = boxBottom - boxTop;
+    // The estimate is deliberately rough, so keep a little slack in hand.
+    const estimated = estimateHeight(ctx, layout, card) * 1.02;
+    const contentScale = Math.max(MIN_CONTENT_SCALE, Math.min(1, available / estimated));
 
-    if (card.big) y = drawBig(ctx, card.big, y + 70);
-    if (card.grid?.length) y = drawGrid(ctx, card.grid, y + 60);
-    if (card.bars?.length) y = drawBars(ctx, card.bars, y + 60);
-    if (card.emojis?.length) y = drawEmojis(ctx, card.emojis, y + 56);
-    if (card.lines?.length) drawLines(ctx, card.lines, y + 52);
+    ctx.save();
+    if (contentScale < 1) {
+        // Scale about the horizontal centre so the margins stay symmetric.
+        ctx.translate(BASE_W / 2, 0);
+        ctx.scale(contentScale, contentScale);
+        ctx.translate(-BASE_W / 2, 0);
+    }
 
-    drawFooter(ctx);
+    // Everything below is in scaled units, so the box has to be too.
+    let y = boxTop / contentScale
+        + Math.max(0, (available / contentScale - estimated) / 2);
+
+    y = drawTag(ctx, layout, card.tag, y);
+    if (card.title) y = drawTitle(ctx, layout, card.title, y + 28);
+    if (card.subtitle) y = drawSubtitle(ctx, layout, card.subtitle, y + 18);
+    if (card.big) y = drawBig(ctx, layout, card.big, y + 70);
+    if (card.grid?.length) y = drawGrid(ctx, layout, card.grid, y + 60);
+    if (card.bars?.length) y = drawBars(ctx, layout, card.bars, y + 60);
+    if (card.emojis?.length) y = drawEmojis(ctx, layout, card.emojis, y + 56);
+    if (card.lines?.length) drawLines(ctx, layout, card.lines, y + 52);
+    ctx.restore();
+
+    drawFooter(ctx, layout);
     return canvas;
 }
 
-/** @returns {Promise<Blob>} */
-export async function renderCardBlob(card) {
-    const canvas = await renderCard(card);
+/**
+ * @param {import('./types.d.ts').SlideCard} card
+ * @param {{ preset?: string }} [options]
+ * @returns {Promise<Blob>}
+ */
+export async function renderCardBlob(card, options = {}) {
+    const canvas = await renderCard(card, options);
     return new Promise((resolve, reject) => {
         canvas.toBlob(
-            (blob) => (blob ? resolve(blob) : reject(new Error("Impossible de générer l'image"))),
+            (blob) => {
+                // A canvas the browser refused to allocate comes back blank and
+                // tiny rather than throwing; treat that as the failure it is.
+                if (!blob || blob.size < 1024) {
+                    reject(new Error("L'image n'a pas pu être générée (format trop grand pour cet appareil)"));
+                    return;
+                }
+                resolve(blob);
+            },
             'image/png',
         );
     });
@@ -93,8 +149,8 @@ export async function renderCardBlob(card) {
  * actually ends in a story), otherwise fall back to a download.
  * @returns {Promise<'shared' | 'downloaded'>}
  */
-export async function shareCard(card, filename = 'whatsapp-wrapped.png') {
-    const blob = await renderCardBlob(card);
+export async function shareCard(card, filename = 'whatsapp-wrapped.png', options = {}) {
+    const blob = await renderCardBlob(card, options);
     const file = new File([blob], filename, { type: 'image/png' });
 
     if (navigator.canShare?.({ files: [file] })) {
@@ -124,11 +180,12 @@ export function downloadBlob(blob, filename) {
 
 /**
  * Rough height of the content block, in the same order `renderCard` draws it.
- * Only used to pick a starting offset, so an approximation is enough — the
- * draw functions remain the single source of truth for actual positions.
+ * Used to centre the block and to decide whether it must be scaled down, so an
+ * approximation is enough — the draw functions remain the source of truth for
+ * actual positions.
  */
-function estimateHeight(ctx, card) {
-    const inner = W - PAD * 2;
+function estimateHeight(ctx, layout, card) {
+    const inner = layout.w - layout.pad * 2;
     let h = 0;
     if (card.tag) h += 80;
     if (card.title) {
@@ -164,54 +221,54 @@ function lineCount(ctx, text, maxWidth) {
 
 // ---------------------------------------------------------------- painting
 
-function paintBackground(ctx, stops) {
-    const g = ctx.createLinearGradient(0, 0, W, H);
+function paintBackground(ctx, { w, h }, stops) {
+    const g = ctx.createLinearGradient(0, 0, w, h);
     g.addColorStop(0, stops[0]);
     g.addColorStop(0.55, stops[1]);
     g.addColorStop(1, stops[2]);
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(0, 0, w, h);
 
     // Two soft light pools, so a flat gradient doesn't read as a wallpaper.
-    for (const [cx, cy, r, alpha] of [[W * 0.85, H * 0.12, 620, 0.16], [W * 0.1, H * 0.82, 700, 0.12]]) {
+    for (const [cx, cy, r, alpha] of [[w * 0.85, h * 0.12, w * 0.57, 0.16], [w * 0.1, h * 0.82, w * 0.65, 0.12]]) {
         const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
         glow.addColorStop(0, `rgba(255,255,255,${alpha})`);
         glow.addColorStop(1, 'rgba(255,255,255,0)');
         ctx.fillStyle = glow;
-        ctx.fillRect(0, 0, W, H);
+        ctx.fillRect(0, 0, w, h);
     }
 }
 
-function drawTag(ctx, tag, y) {
+function drawTag(ctx, { pad }, tag, y) {
     if (!tag) return y;
     ctx.font = `600 30px ${BODY}`;
     const textW = ctx.measureText(tag.toUpperCase()).width;
     const padX = 30;
     const h = 62;
-    roundRect(ctx, PAD, y - h + 14, textW + padX * 2, h, h / 2);
+    roundRect(ctx, pad, y - h + 14, textW + padX * 2, h, h / 2);
     ctx.fillStyle = 'rgba(255,255,255,0.14)';
     ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
     ctx.textBaseline = 'middle';
-    ctx.fillText(tag.toUpperCase(), PAD + padX, y - h + 14 + h / 2 + 1);
+    ctx.fillText(tag.toUpperCase(), pad + padX, y - h + 14 + h / 2 + 1);
     return y + 18;
 }
 
-function drawTitle(ctx, title, y) {
+function drawTitle(ctx, { w, pad }, title, y) {
     ctx.fillStyle = '#ffffff';
     ctx.font = `700 76px ${DISPLAY}`;
     ctx.textBaseline = 'top';
-    return wrapText(ctx, title, PAD, y, W - PAD * 2, 88);
+    return wrapText(ctx, title, pad, y, w - pad * 2, 88);
 }
 
-function drawSubtitle(ctx, text, y) {
+function drawSubtitle(ctx, { w, pad }, text, y) {
     ctx.fillStyle = 'rgba(255,255,255,0.68)';
     ctx.font = `400 34px ${BODY}`;
     ctx.textBaseline = 'top';
-    return wrapText(ctx, text, PAD, y, W - PAD * 2, 46);
+    return wrapText(ctx, text, pad, y, w - pad * 2, 46);
 }
 
-function drawBig(ctx, big, y) {
+function drawBig(ctx, { w, pad }, big, y) {
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#ffffff';
     // Shrink to fit rather than overflow: "1 234 567" must stay on one line.
@@ -219,23 +276,23 @@ function drawBig(ctx, big, y) {
     do {
         ctx.font = `700 ${size}px ${DISPLAY}`;
         size -= 10;
-    } while (ctx.measureText(big.value).width > W - PAD * 2 && size > 70);
+    } while (ctx.measureText(big.value).width > w - pad * 2 && size > 70);
 
-    ctx.fillText(big.value, PAD, y);
+    ctx.fillText(big.value, pad, y);
     const lineH = size + 10;
     ctx.fillStyle = 'rgba(255,255,255,0.72)';
     ctx.font = `500 38px ${BODY}`;
-    ctx.fillText(big.label, PAD, y + lineH + 8);
+    ctx.fillText(big.label, pad, y + lineH + 8);
     return y + lineH + 60;
 }
 
-function drawGrid(ctx, cells, y) {
+function drawGrid(ctx, { w, pad }, cells, y) {
     const cols = 2;
     const gap = 24;
-    const cw = (W - PAD * 2 - gap * (cols - 1)) / cols;
+    const cw = (w - pad * 2 - gap * (cols - 1)) / cols;
     const ch = 150;
     cells.slice(0, 6).forEach(([value, label], i) => {
-        const cx = PAD + (i % cols) * (cw + gap);
+        const cx = pad + (i % cols) * (cw + gap);
         const cy = y + Math.floor(i / cols) * (ch + gap);
         roundRect(ctx, cx, cy, cw, ch, 28);
         ctx.fillStyle = 'rgba(255,255,255,0.08)';
@@ -256,41 +313,41 @@ function drawGrid(ctx, cells, y) {
     return y + rows * (ch + gap);
 }
 
-function drawBars(ctx, bars, y) {
+function drawBars(ctx, { w, pad }, bars, y) {
     const rowH = 108;
-    const barW = W - PAD * 2;
+    const barW = w - pad * 2;
     bars.slice(0, 8).forEach((bar, i) => {
         const by = y + i * rowH;
         ctx.textBaseline = 'top';
         ctx.fillStyle = '#ffffff';
         ctx.font = `600 34px ${BODY}`;
-        ctx.fillText(fit(ctx, bar.label, barW - 300), PAD, by);
+        ctx.fillText(fit(ctx, bar.label, barW - 300), pad, by);
 
         ctx.fillStyle = 'rgba(255,255,255,0.66)';
         ctx.font = `400 32px ${BODY}`;
         ctx.textAlign = 'right';
-        ctx.fillText(bar.value, W - PAD, by);
+        ctx.fillText(bar.value, w - pad, by);
         ctx.textAlign = 'left';
 
-        roundRect(ctx, PAD, by + 52, barW, 22, 11);
+        roundRect(ctx, pad, by + 52, barW, 22, 11);
         ctx.fillStyle = 'rgba(255,255,255,0.12)';
         ctx.fill();
 
         const filled = Math.max(0.02, Math.min(1, bar.ratio ?? 0)) * barW;
-        roundRect(ctx, PAD, by + 52, filled, 22, 11);
+        roundRect(ctx, pad, by + 52, filled, 22, 11);
         ctx.fillStyle = bar.color || '#8B5CF6';
         ctx.fill();
     });
     return y + Math.min(bars.length, 8) * rowH;
 }
 
-function drawEmojis(ctx, emojis, y) {
+function drawEmojis(ctx, { w, pad }, emojis, y) {
     const cols = 5;
     const gap = 20;
-    const cw = (W - PAD * 2 - gap * (cols - 1)) / cols;
+    const cw = (w - pad * 2 - gap * (cols - 1)) / cols;
     const ch = 150;
     emojis.slice(0, 10).forEach(([emoji, count], i) => {
-        const cx = PAD + (i % cols) * (cw + gap);
+        const cx = pad + (i % cols) * (cw + gap);
         const cy = y + Math.floor(i / cols) * (ch + gap);
         roundRect(ctx, cx, cy, cw, ch, 24);
         ctx.fillStyle = 'rgba(255,255,255,0.08)';
@@ -309,26 +366,26 @@ function drawEmojis(ctx, emojis, y) {
     return y + rows * (ch + gap);
 }
 
-function drawLines(ctx, lines, y) {
+function drawLines(ctx, { w, pad }, lines, y) {
     let cursor = y;
     ctx.textBaseline = 'top';
     for (const line of lines.slice(0, 6)) {
         ctx.fillStyle = 'rgba(255,255,255,0.55)';
         ctx.font = `400 34px ${BODY}`;
-        ctx.fillText('—', PAD, cursor + 2);
+        ctx.fillText('—', pad, cursor + 2);
         ctx.fillStyle = 'rgba(255,255,255,0.88)';
-        cursor = wrapText(ctx, line, PAD + 52, cursor, W - PAD * 2 - 52, 46) + 18;
+        cursor = wrapText(ctx, line, pad + 52, cursor, w - pad * 2 - 52, 46) + 18;
     }
     return cursor;
 }
 
-function drawFooter(ctx) {
+function drawFooter(ctx, { w, h, pad }) {
     ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = 'rgba(255,255,255,0.45)';
     ctx.font = `500 30px ${BODY}`;
-    ctx.fillText('WhatsApp Wrapped', PAD, H - PAD);
+    ctx.fillText('WhatsApp Wrapped', pad, h - pad);
     ctx.textAlign = 'right';
-    ctx.fillText('100% hors-ligne', W - PAD, H - PAD);
+    ctx.fillText('100% hors-ligne', w - pad, h - pad);
     ctx.textAlign = 'left';
 }
 
