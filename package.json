@@ -1,9 +1,9 @@
 {
-  "name": "whatsapp-wrapped",
+  "name": "chatwrap",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "WhatsApp Wrapped — 100% client-side chat analytics",
+  "description": "Chatwrap — 100% client-side chat analytics",
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",

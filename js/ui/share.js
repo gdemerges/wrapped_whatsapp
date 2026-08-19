@@ -106,7 +106,7 @@ export function openShareSheet({ stats, comparison, card, recapCard }) {
                             showToast('Génération du poster…');
                             const result = await shareCard(
                                 buildPosterCard(stats),
-                                `whatsapp-wrapped-poster-${format}.png`,
+                                `chatwrap-poster-${format}.png`,
                                 { preset: format },
                             );
                             track('poster', { format });
@@ -150,5 +150,5 @@ function filenameFor(card) {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '')
         .slice(0, 40);
-    return `whatsapp-wrapped-${slug || 'slide'}.png`;
+    return `chatwrap-${slug || 'slide'}.png`;
 }

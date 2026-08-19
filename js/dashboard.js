@@ -525,7 +525,7 @@ function wireToolbar() {
 function exportJSON() {
     if (!current) return;
     const blob = new Blob([JSON.stringify(current.stats, null, 2)], { type: 'application/json' });
-    downloadBlob(blob, 'whatsapp-wrapped-stats.json');
+    downloadBlob(blob, 'chatwrap-stats.json');
     track('export', { format: 'json' });
     showToast('Stats exportées en JSON');
 }
@@ -554,7 +554,7 @@ function exportCSV() {
     const csv = [header, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n');
     // BOM so Excel opens UTF-8 accents correctly.
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
-    downloadBlob(blob, 'whatsapp-wrapped-participants.csv');
+    downloadBlob(blob, 'chatwrap-participants.csv');
     track('export', { format: 'csv' });
     showToast('Stats exportées en CSV');
 }

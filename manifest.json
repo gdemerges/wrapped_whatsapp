@@ -1,7 +1,7 @@
 {
-    "name": "WhatsApp Wrapped",
-    "short_name": "WA Wrapped",
-    "description": "Analyse tes conversations WhatsApp et génère une présentation animée, 100% dans ton navigateur.",
+    "name": "Chatwrap",
+    "short_name": "Chatwrap",
+    "description": "Chatwrap analyse tes conversations WhatsApp et en fait une rétrospective animée, 100% dans ton navigateur.",
     "lang": "fr",
     "start_url": "index.html",
     "scope": ".",

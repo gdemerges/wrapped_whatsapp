@@ -149,13 +149,13 @@ export async function renderCardBlob(card, options = {}) {
  * actually ends in a story), otherwise fall back to a download.
  * @returns {Promise<'shared' | 'downloaded'>}
  */
-export async function shareCard(card, filename = 'whatsapp-wrapped.png', options = {}) {
+export async function shareCard(card, filename = 'chatwrap.png', options = {}) {
     const blob = await renderCardBlob(card, options);
     const file = new File([blob], filename, { type: 'image/png' });
 
     if (navigator.canShare?.({ files: [file] })) {
         try {
-            await navigator.share({ files: [file], title: 'Mon WhatsApp Wrapped' });
+            await navigator.share({ files: [file], title: 'Mon Chatwrap' });
             return 'shared';
         } catch (err) {
             if (err && err.name === 'AbortError') return 'shared'; // user cancelled
@@ -383,7 +383,7 @@ function drawFooter(ctx, { w, h, pad }) {
     ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = 'rgba(255,255,255,0.45)';
     ctx.font = `500 30px ${BODY}`;
-    ctx.fillText('WhatsApp Wrapped', pad, h - pad);
+    ctx.fillText('Chatwrap', pad, h - pad);
     ctx.textAlign = 'right';
     ctx.fillText('100% hors-ligne', w - pad, h - pad);
     ctx.textAlign = 'left';

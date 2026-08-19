@@ -1,6 +1,10 @@
-# WhatsApp Wrapped
+# Chatwrap
 
-Analyse tes conversations WhatsApp et génère une présentation animée à la façon Spotify Wrapped — directement dans ton navigateur, sans aucun envoi de données.
+Chatwrap analyse tes conversations WhatsApp et en fait une rétrospective animée — directement
+dans ton navigateur, sans aucun envoi de données.
+
+> Chatwrap est un projet indépendant, sans lien avec WhatsApp ni avec Meta. Le nom WhatsApp
+> n'est mentionné que pour décrire les fichiers d'export que l'outil sait lire.
 
 ## Fonctionnalités
 

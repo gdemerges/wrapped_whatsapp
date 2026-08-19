@@ -1,5 +1,12 @@
 # CLAUDE.md
 
+Le projet s'appelle **Chatwrap**. Il lit des exports WhatsApp mais n'a aucun lien avec
+WhatsApp ni Meta : ne jamais réintroduire « WhatsApp » dans un nom de produit, un titre ou
+un nom de fichier exporté — uniquement dans une phrase descriptive (« tes conversations
+WhatsApp »). Les clés de stockage internes (`ww-*`, base `wa-wrapped`) restent inchangées :
+elles ne sont visibles de personne, et les renommer invaliderait les préférences et le cache
+des utilisateurs existants sans rien apporter.
+
 ## Stack
 Vanilla JS ES modules, HTML, CSS — pas de framework, pas de build step.
 Vitest pour les tests, ESLint pour le lint.
