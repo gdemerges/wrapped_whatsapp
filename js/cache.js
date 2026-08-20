@@ -27,13 +27,63 @@ function openDB() {
     });
 }
 
+/**
+ * Past this many characters, a file is fingerprinted by its head, its tail and
+ * its length rather than in full — hashing 50 MB to decide whether to reuse a
+ * cache entry costs more than recomputing the stats.
+ */
+const FULL_HASH_LIMIT = 1_000_000;
+const EDGE = 100_000;
+
+async function sha1(input) {
+    const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(input));
+    return Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Incremental counterpart of `hashText`, for a file read as a stream.
+ *
+ * It holds at most `FULL_HASH_LIMIT` characters: once the file is bigger than
+ * that, only the first and last `EDGE` characters are kept and the rest is
+ * counted and dropped. Same inputs, same digest as `hashText` — a file already
+ * in the cache still hits it.
+ *
+ * @returns {{ push: (chunk: string) => void, digest: () => Promise<string> }}
+ */
+export function createHasher() {
+    let whole = '';
+    let head = '';
+    let tail = '';
+    let length = 0;
+    let overflowed = false;
+
+    return {
+        push(chunk) {
+            length += chunk.length;
+            if (!overflowed) {
+                whole += chunk;
+                if (whole.length <= FULL_HASH_LIMIT) return;
+                overflowed = true;
+                head = whole.slice(0, EDGE);
+                tail = whole.slice(-EDGE);
+                whole = '';
+                return;
+            }
+            tail = (tail + chunk).slice(-EDGE);
+        },
+        digest() {
+            return overflowed
+                ? sha1(head + '|' + length + '|' + tail)
+                : sha1(whole);
+        },
+    };
+}
+
 /** Quick non-cryptographic hash — good enough for cache keys. */
 export async function hashText(text) {
-    const data = new TextEncoder().encode(text.length > 1_000_000
-        ? text.slice(0, 100_000) + '|' + text.length + '|' + text.slice(-100_000)
+    return sha1(text.length > FULL_HASH_LIMIT
+        ? text.slice(0, EDGE) + '|' + text.length + '|' + text.slice(-EDGE)
         : text);
-    const buf = await crypto.subtle.digest('SHA-1', data);
-    return Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**

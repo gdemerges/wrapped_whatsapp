@@ -1,4 +1,6 @@
-import { escapeHtml, fmt } from '../utils.js';
+import { escapeHtml } from '../utils.js';
+import { fmt } from '../format.js';
+import { t } from '../i18n.js';
 import { CHART_COLORS } from './_constants.js';
 import { barsFrom } from './_card.js';
 
@@ -25,17 +27,17 @@ export function linksSlide(stats, gradient) {
         gradient,
         card: {
             gradient,
-            tag: 'Liens',
-            big: { value: fmt(stats.totalLinks), label: 'liens partagés' },
-            subtitle: 'Les sites qui reviennent le plus',
+            tag: t('slide.links.tag'),
+            big: { value: fmt(stats.totalLinks), label: t('slide.links.big') },
+            subtitle: t('slide.links.subtitle'),
             bars: barsFrom(domains, d => d[1], d => fmt(d[1])),
         },
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Liens</span>
+                <span class="slide-tag">${t('slide.links.tag')}</span>
                 <div class="big-number">${fmt(stats.totalLinks)}</div>
-                <div class="big-label">liens partagés</div>
-                <p class="slide-subtitle">Les sites qui reviennent le plus</p>
+                <div class="big-label">${t('slide.links.big')}</div>
+                <p class="slide-subtitle">${t('slide.links.subtitle')}</p>
                 <div class="ranking-list">${rows}</div>
             </div>
         `,

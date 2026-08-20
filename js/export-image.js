@@ -16,6 +16,7 @@
  */
 
 import { resolvePreset, buildPosterCard } from './export-presets.js';
+import { t } from './i18n.js';
 
 export { buildPosterCard };
 
@@ -134,7 +135,7 @@ export async function renderCardBlob(card, options = {}) {
                 // A canvas the browser refused to allocate comes back blank and
                 // tiny rather than throwing; treat that as the failure it is.
                 if (!blob || blob.size < 1024) {
-                    reject(new Error("L'image n'a pas pu être générée (format trop grand pour cet appareil)"));
+                    reject(new Error(t('image.renderFailed')));
                     return;
                 }
                 resolve(blob);
@@ -155,7 +156,7 @@ export async function shareCard(card, filename = 'chatwrap.png', options = {}) {
 
     if (navigator.canShare?.({ files: [file] })) {
         try {
-            await navigator.share({ files: [file], title: 'Mon Chatwrap' });
+            await navigator.share({ files: [file], title: t('image.shareTitle') });
             return 'shared';
         } catch (err) {
             if (err && err.name === 'AbortError') return 'shared'; // user cancelled
@@ -385,7 +386,7 @@ function drawFooter(ctx, { w, h, pad }) {
     ctx.font = `500 30px ${BODY}`;
     ctx.fillText('Chatwrap', pad, h - pad);
     ctx.textAlign = 'right';
-    ctx.fillText('100% hors-ligne', w - pad, h - pad);
+    ctx.fillText(t('image.footer'), w - pad, h - pad);
     ctx.textAlign = 'left';
 }
 

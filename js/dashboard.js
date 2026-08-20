@@ -3,7 +3,9 @@
  * Data source (in order): sessionStorage 'ww-stats' → URL #share=<lzstring>.
  */
 
-import { escapeHtml, fmt, fmtDate, DAYS_FR } from './utils.js';
+import { escapeHtml } from './utils.js';
+import { fmt, fmtDate, fmtClock, fmtHour, fmtTime, dayNames, peakDayName, monthMedium } from './format.js';
+import { t, initLocale, setLocale, getLocale, onLocaleChange, applyStaticI18n, LOCALES } from './i18n.js';
 import { rehydrateDates, sanitizeShared } from './payload.js';
 import { ensureLZString } from './vendor.js';
 import { openShareSheet } from './ui/share.js';
@@ -12,10 +14,8 @@ import { downloadBlob } from './export-image.js';
 import { readHash } from './ui/hash.js';
 import { track, trackPageview } from './analytics.js';
 
-function fmtClock(date) {
-    const d = date instanceof Date ? date : new Date(date);
-    return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-}
+initLocale();
+applyStaticI18n();
 
 const STORAGE_KEY = 'ww-stats';
 const $ = (sel) => document.querySelector(sel);
@@ -44,14 +44,41 @@ function initTheme() {
     });
 }
 function applyLabel(btn, theme) {
-    btn.setAttribute('aria-label', theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre');
-    btn.setAttribute('title', theme === 'dark' ? 'Mode clair' : 'Mode sombre');
+    btn.setAttribute('aria-label', t(theme === 'dark' ? 'theme.toLight' : 'theme.toDark'));
+    btn.setAttribute('title', t(theme === 'dark' ? 'theme.light' : 'theme.dark'));
 }
+
+/**
+ * The language picker, and the full re-render behind it.
+ *
+ * Every card is a string of HTML built from the stats, so switching language
+ * means rebuilding all of them — cheaper than threading a locale through two
+ * dozen template functions, and it keeps the active participant filter honest
+ * because `render` re-runs the filter wiring too.
+ */
+function initLangPicker() {
+    const select = $('#lang-select');
+    if (!select) return;
+    select.innerHTML = Object.values(LOCALES)
+        .map(l => `<option value="${l.code}">${escapeHtml(l.label)}</option>`).join('');
+    select.value = getLocale();
+    select.addEventListener('change', () => setLocale(select.value));
+}
+
+onLocaleChange(() => {
+    applyStaticI18n();
+    const btn = $('#theme-toggle');
+    if (btn) applyLabel(btn, document.documentElement.dataset.theme);
+    const picker = $('#lang-select');
+    if (picker) picker.value = getLocale();
+    if (current) render(current.stats, current.comparison);
+});
 
 // ---------- Load ----------
 /** @type {{ stats: any, comparison: any } | null} */
 let current = null;
 
+initLangPicker();
 trackPageview();
 boot();
 
@@ -76,7 +103,7 @@ async function loadPayload() {
             }
         } catch (e) {
             console.error(e);
-            showError('Ce lien de partage est illisible');
+            showError(t('error.unreadableLink'));
         }
     }
     try {
@@ -117,27 +144,24 @@ function render(stats, comparison) {
 
 // ---------- New cards ----------
 
-const CHAPTER_LABEL = { high: 'Période intense', steady: 'Rythme de croisière', low: 'Période calme' };
-
-function monthName(key) {
-    const [y, m] = key.split('-');
-    return new Date(Number(y), Number(m) - 1).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
-}
+const CHAPTER_KEYS = { high: 'high', steady: 'steady', low: 'low' };
+const chapterLabel = (intensity) =>
+    CHAPTER_KEYS[intensity] ? t(`slide.chapters.${CHAPTER_KEYS[intensity]}`) : intensity;
 
 function chaptersCard(s) {
     const rows = s.chapters.map((c, i) => `
         <tr>
             <td>${i + 1}</td>
-            <td>${escapeHtml(CHAPTER_LABEL[c.intensity] || c.intensity)}</td>
-            <td>${monthName(c.from)} → ${monthName(c.to)}</td>
+            <td>${escapeHtml(chapterLabel(c.intensity))}</td>
+            <td>${monthMedium(c.from)} → ${monthMedium(c.to)}</td>
             <td>${fmt(c.total)}</td>
             <td>${fmt(c.avgPerMonth)}</td>
         </tr>`).join('');
     return `
     <section class="dash-card col-12">
-        <h2>Chapitres <span class="dash-meta">les phases où le rythme a changé</span></h2>
+        <h2>${t('dash.chapters')} <span class="dash-meta">${t('dash.chaptersMeta')}</span></h2>
         <table class="dash-table">
-            <thead><tr><th>#</th><th>Phase</th><th>Période</th><th>Messages</th><th>/ mois</th></tr></thead>
+            <thead><tr><th>#</th><th>${t('dash.phase')}</th><th>${t('dash.period')}</th><th>${t('dash.messages')}</th><th>${t('dash.perMonth')}</th></tr></thead>
             <tbody>${rows}</tbody>
         </table>
     </section>`;
@@ -148,17 +172,17 @@ function profilesCard(s) {
         <tr data-person="${escapeHtml(p.name)}">
             <td>${escapeHtml(p.name)}</td>
             <td>${fmt(p.count)}</td>
-            <td>${p.peakHour}h</td>
-            <td>${p.topEmoji ? escapeHtml(p.topEmoji[0]) : '—'}</td>
-            <td>${p.signatureWord ? escapeHtml(p.signatureWord[0]) : '—'}</td>
-            <td>${p.topDomain ? escapeHtml(p.topDomain[0]) : '—'}</td>
+            <td>${fmtHour(p.peakHour)}</td>
+            <td>${p.topEmoji ? escapeHtml(p.topEmoji[0]) : t('common.none')}</td>
+            <td>${p.signatureWord ? escapeHtml(p.signatureWord[0]) : t('common.none')}</td>
+            <td>${p.topDomain ? escapeHtml(p.topDomain[0]) : t('common.none')}</td>
             <td>${fmt(p.initiations)}</td>
         </tr>`).join('');
     return `
     <section class="dash-card col-12">
-        <h2>Profils</h2>
+        <h2>${t('dash.profiles')}</h2>
         <table class="dash-table">
-            <thead><tr><th>Personne</th><th>Messages</th><th>Heure</th><th>Emoji</th><th>Mot</th><th>Site</th><th>Jours lancés</th></tr></thead>
+            <thead><tr><th>${t('dash.person')}</th><th>${t('dash.messages')}</th><th>${t('dash.hour')}</th><th>${t('dash.emoji')}</th><th>${t('dash.word')}</th><th>${t('dash.site')}</th><th>${t('dash.initiations')}</th></tr></thead>
             <tbody>${rows}</tbody>
         </table>
     </section>`;
@@ -174,11 +198,11 @@ function interactionsCard(s) {
         <tr data-person="${escapeHtml(who)}"><td>${escapeHtml(who)}</td><td>${escapeHtml(target.author)}</td><td>${fmt(target.count)}</td></tr>`).join('');
     return `
     <section class="dash-card col-6">
-        <h2>Qui parle à qui <span class="dash-meta">réponses échangées</span></h2>
+        <h2>${t('dash.whoTalksTo')} <span class="dash-meta">${t('dash.whoTalksToMeta')}</span></h2>
         <table class="dash-table"><tbody>${pairs}</tbody></table>
-        <h4 class="dash-subheading">Interlocuteur privilégié</h4>
+        <h4 class="dash-subheading">${t('dash.closest')}</h4>
         <table class="dash-table">
-            <thead><tr><th>Personne</th><th>Répond surtout à</th><th>Fois</th></tr></thead>
+            <thead><tr><th>${t('dash.person')}</th><th>${t('dash.answersMostly')}</th><th>${t('dash.times')}</th></tr></thead>
             <tbody>${closest}</tbody>
         </table>
     </section>`;
@@ -189,21 +213,21 @@ function domainsCard(s) {
         `<tr><td>${escapeHtml(domain)}</td><td>${fmt(count)}</td></tr>`).join('');
     return `
     <section class="dash-card col-6">
-        <h2>Sites partagés <span class="dash-meta">${fmt(s.totalLinks)} liens</span></h2>
-        <table class="dash-table"><thead><tr><th>Domaine</th><th>Liens</th></tr></thead><tbody>${rows}</tbody></table>
+        <h2>${t('dash.domains')} <span class="dash-meta">${t('dash.domainsMeta', { n: fmt(s.totalLinks) })}</span></h2>
+        <table class="dash-table"><thead><tr><th>${t('dash.domain')}</th><th>${t('dash.links')}</th></tr></thead><tbody>${rows}</tbody></table>
     </section>`;
 }
 
 function heroCard(s) {
     return `
     <section class="dash-hero">
-        <div class="dash-hero-period">${fmtDate(s.startDate)} — ${fmtDate(s.endDate)} · ${s.totalDays} jours</div>
-        <div class="dash-hero-item"><div class="dash-hero-value">${fmt(s.totalMessages)}</div><div class="dash-hero-label">messages</div></div>
-        <div class="dash-hero-item"><div class="dash-hero-value">${s.avgPerDay}</div><div class="dash-hero-label">/ jour</div></div>
-        <div class="dash-hero-item"><div class="dash-hero-value">${s.participants}</div><div class="dash-hero-label">participants</div></div>
-        <div class="dash-hero-item"><div class="dash-hero-value">${fmt(s.emojis?.total || 0)}</div><div class="dash-hero-label">emojis</div></div>
-        <div class="dash-hero-item"><div class="dash-hero-value">${fmt(s.totalMedia)}</div><div class="dash-hero-label">médias</div></div>
-        <div class="dash-hero-item"><div class="dash-hero-value">${s.streak?.max || 0}j</div><div class="dash-hero-label">meilleur streak</div></div>
+        <div class="dash-hero-period">${fmtDate(s.startDate)} — ${fmtDate(s.endDate)} · ${t('dash.heroDays', { n: s.totalDays })}</div>
+        <div class="dash-hero-item"><div class="dash-hero-value">${fmt(s.totalMessages)}</div><div class="dash-hero-label">${t('units.messages')}</div></div>
+        <div class="dash-hero-item"><div class="dash-hero-value">${s.avgPerDay}</div><div class="dash-hero-label">${t('dash.perDay')}</div></div>
+        <div class="dash-hero-item"><div class="dash-hero-value">${s.participants}</div><div class="dash-hero-label">${t('units.participants')}</div></div>
+        <div class="dash-hero-item"><div class="dash-hero-value">${fmt(s.emojis?.total || 0)}</div><div class="dash-hero-label">${t('units.emojis')}</div></div>
+        <div class="dash-hero-item"><div class="dash-hero-value">${fmt(s.totalMedia)}</div><div class="dash-hero-label">${t('units.media')}</div></div>
+        <div class="dash-hero-item"><div class="dash-hero-value">${t('format.days', { n: s.streak?.max || 0 })}</div><div class="dash-hero-label">${t('units.bestStreak')}</div></div>
     </section>`;
 }
 
@@ -212,19 +236,19 @@ function comparisonCard(c) {
         const pct = data.pct;
         const arrow = pct == null ? '' : pct > 0 ? '▲' : pct < 0 ? '▼' : '=';
         const trendClass = pct == null ? 'dash-trend-flat' : pct > 0 ? 'dash-trend-up' : pct < 0 ? 'dash-trend-down' : 'dash-trend-flat';
-        return `<tr><td>${label}</td><td>${fmt(data.previous)}${unit}</td><td>${fmt(data.current)}${unit}</td><td class="${trendClass}">${arrow} ${pct == null ? '—' : Math.abs(pct) + '%'}</td></tr>`;
+        return `<tr><td>${label}</td><td>${fmt(data.previous)}${unit}</td><td>${fmt(data.current)}${unit}</td><td class="${trendClass}">${arrow} ${pct == null ? t('common.none') : Math.abs(pct) + '%'}</td></tr>`;
     };
     return `
     <section class="dash-card col-12">
-        <h2>Année N vs N-1</h2>
+        <h2>${t('dash.comparison')}</h2>
         <table class="dash-table">
-            <thead><tr><th>Métrique</th><th>N-1</th><th>N</th><th>Évolution</th></tr></thead>
+            <thead><tr><th>${t('dash.metric')}</th><th>${t('dash.previous')}</th><th>${t('dash.currentYear')}</th><th>${t('dash.change')}</th></tr></thead>
             <tbody>
-                ${row('Messages', c.messages)}
-                ${row('Moyenne / jour', c.avgPerDay)}
-                ${row('Emojis', c.emojis)}
-                ${row('Médias', c.media)}
-                <tr><td>Meilleur streak</td><td>${c.streak.previous}j</td><td>${c.streak.current}j</td><td>—</td></tr>
+                ${row(t('dash.messages'), c.messages)}
+                ${row(t('dash.avgPerDay'), c.avgPerDay)}
+                ${row(t('slide.comparison.emojis'), c.emojis)}
+                ${row(t('slide.comparison.media'), c.media)}
+                <tr><td>${t('dash.bestStreak')}</td><td>${t('format.days', { n: c.streak.previous })}</td><td>${t('format.days', { n: c.streak.current })}</td><td>${t('common.none')}</td></tr>
             </tbody>
         </table>
     </section>`;
@@ -233,16 +257,17 @@ function comparisonCard(c) {
 function overviewCard(s) {
     return `
     <section class="dash-card col-6">
-        <h2>Vue d'ensemble</h2>
+        <h2>${t('dash.overview')}</h2>
         <dl class="dash-kv">
-            <dt>Total caractères</dt><dd>${fmt(s.totalChars)}</dd>
-            <dt>Longueur moyenne</dt><dd>${s.avgMsgLen} car.</dd>
-            <dt>Liens partagés</dt><dd>${fmt(s.totalLinks)}</dd>
-            <dt>Messages modifiés</dt><dd>${fmt(s.totalEdited)}</dd>
-            <dt>Pic horaire</dt><dd>${s.peakHour}h</dd>
-            <dt>Pic jour</dt><dd>${s.peakDay}</dd>
-            <dt>Jour le plus actif</dt><dd>${escapeHtml(s.mostActiveDay?.[0] || '—')} (${fmt(s.mostActiveDay?.[1] || 0)})</dd>
-            <dt>Langue détectée</dt><dd>${(s.lang || 'fr').toUpperCase()}</dd>
+            <dt>${t('dash.totalChars')}</dt><dd>${fmt(s.totalChars)}</dd>
+            <dt>${t('dash.avgLen')}</dt><dd>${t('format.chars', { n: s.avgMsgLen })}</dd>
+            <dt>${t('dash.sharedLinks')}</dt><dd>${fmt(s.totalLinks)}</dd>
+            <dt>${t('dash.edited')}</dt><dd>${fmt(s.totalEdited)}</dd>
+            <dt>${t('dash.deleted')}</dt><dd>${fmt(s.totalDeleted || 0)}</dd>
+            <dt>${t('dash.peakHour')}</dt><dd>${fmtHour(s.peakHour)}</dd>
+            <dt>${t('dash.peakDay')}</dt><dd>${escapeHtml(peakDayName(s))}</dd>
+            <dt>${t('dash.busiestDay')}</dt><dd>${escapeHtml(s.mostActiveDay?.[0] || t('common.none'))} (${fmt(s.mostActiveDay?.[1] || 0)})</dd>
+            <dt>${t('dash.detectedLang')}</dt><dd>${(s.lang || 'fr').toUpperCase()}</dd>
         </dl>
     </section>`;
 }
@@ -251,9 +276,9 @@ function rankingCard(s) {
     const emojiMap = Object.fromEntries(s.emojis?.perPerson || []);
     return `
     <section class="dash-card col-6">
-        <h2>Classement</h2>
+        <h2>${t('dash.ranking')}</h2>
         <table class="dash-table">
-            <thead><tr><th>#</th><th>Nom</th><th>Messages</th><th>%</th><th>Moy.</th><th>Emojis</th></tr></thead>
+            <thead><tr><th>#</th><th>${t('dash.name')}</th><th>${t('dash.messages')}</th><th>%</th><th>${t('dash.avg')}</th><th>${t('slide.comparison.emojis')}</th></tr></thead>
             <tbody>${s.ranking.map(([name, d], i) => {
                 const rank = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
                 return `<tr data-person="${escapeHtml(name)}"><td class="dash-rank ${rank}">${i + 1}</td><td>${escapeHtml(name)}</td><td>${fmt(d.count)}</td><td>${d.percent}%</td><td>${d.avgLen}</td><td>${fmt(emojiMap[name] || 0)}</td></tr>`;
@@ -266,23 +291,24 @@ function activityCard(s) {
     const max = Math.max(...s.hourly);
     const bars = s.hourly.map((v, h) => {
         const pct = max ? (v / max) * 100 : 0;
-        return `<div class="dash-hour-bar" title="${h}h : ${v} messages">
+        return `<div class="dash-hour-bar" title="${t('dash.hourTooltip', { hour: fmtHour(h), n: v })}">
             <div class="dash-hour-track"><div class="dash-hour-fill" style="--fill:${pct}%"></div></div>
             <div class="dash-hour-label">${h}</div>
         </div>`;
     }).join('');
     const dayMax = Math.max(...s.weekday);
+    const days = dayNames();
     const dayBars = s.weekday.map((v, i) => {
         const pct = dayMax ? (v / dayMax) * 100 : 0;
         return `<div class="dash-day-row">
-            <span class="dash-day-name">${DAYS_FR[i].slice(0, 3)}</span>
+            <span class="dash-day-name">${days[i].slice(0, 3)}</span>
             <div class="dash-day-track"><div class="dash-day-fill" style="--fill:${pct}%"></div></div>
             <span class="dash-day-count">${fmt(v)}</span>
         </div>`;
     }).join('');
     return `
     <section class="dash-card col-12">
-        <h2>Activité</h2>
+        <h2>${t('dash.activity')}</h2>
         <div class="dash-hourly-row">${bars}</div>
         <div class="dash-day-list">${dayBars}</div>
     </section>`;
@@ -293,7 +319,7 @@ function emojisCard(s) {
     const chips = s.emojis.top.map(([e, c]) => `<span class="dash-chip">${escapeHtml(e)} <span class="count">${fmt(c)}</span></span>`).join('');
     return `
     <section class="dash-card col-6">
-        <h2>Top emojis <span class="dash-meta">${fmt(s.emojis.total)} envoyés · ${s.emojis.unique} uniques</span></h2>
+        <h2>${t('dash.topEmojis')} <span class="dash-meta">${t('dash.topEmojisMeta', { n: fmt(s.emojis.total), unique: s.emojis.unique })}</span></h2>
         <div class="dash-chips">${chips}</div>
     </section>`;
 }
@@ -303,9 +329,9 @@ function reactionsCard(s) {
     const authors = (s.reactions.perAuthor || []).map(([n, c]) => `<tr data-person="${escapeHtml(n)}"><td>${escapeHtml(n)}</td><td>${fmt(c)}</td></tr>`).join('');
     return `
     <section class="dash-card col-6">
-        <h2>Réactions <span class="dash-meta">${fmt(s.reactions.total)} au total</span></h2>
+        <h2>${t('dash.reactions')} <span class="dash-meta">${t('dash.reactionsMeta', { n: fmt(s.reactions.total) })}</span></h2>
         <div class="dash-chips dash-chips--spaced">${emojis}</div>
-        <table class="dash-table"><thead><tr><th>Auteur</th><th>Réactions</th></tr></thead><tbody>${authors}</tbody></table>
+        <table class="dash-table"><thead><tr><th>${t('dash.author')}</th><th>${t('dash.reactions')}</th></tr></thead><tbody>${authors}</tbody></table>
     </section>`;
 }
 
@@ -314,7 +340,7 @@ function wordsCard(s) {
     const chips = s.topWords.slice(0, 25).map(([w, c]) => `<span class="dash-chip">${escapeHtml(w)} <span class="count">${fmt(c)}</span></span>`).join('');
     return `
     <section class="dash-card col-12">
-        <h2>Mots les plus utilisés</h2>
+        <h2>${t('dash.topWords')}</h2>
         <div class="dash-chips">${chips}</div>
     </section>`;
 }
@@ -322,11 +348,11 @@ function wordsCard(s) {
 function signatureCard(s) {
     const blocks = Object.entries(s.uniqueWordsPerPerson).map(([author, words]) => {
         const chips = words.slice(0, 10).map(([w, c]) => `<span class="dash-chip">${escapeHtml(w)} <span class="count">${c}</span></span>`).join('');
-        return `<div class="dash-sig-block"><h4>${escapeHtml(author)}</h4><div class="dash-chips">${chips || '<span class="dash-empty-note">Aucun mot unique</span>'}</div></div>`;
+        return `<div class="dash-sig-block"><h4>${escapeHtml(author)}</h4><div class="dash-chips">${chips || `<span class="dash-empty-note">${t('dash.noUniqueWords')}</span>`}</div></div>`;
     }).join('');
     return `
     <section class="dash-card col-12">
-        <h2>Signature lexicale <span class="dash-meta">mots exclusifs à chaque personne</span></h2>
+        <h2>${t('dash.signature')} <span class="dash-meta">${t('dash.signatureMeta')}</span></h2>
         <div class="dash-signature">${blocks}</div>
     </section>`;
 }
@@ -334,24 +360,24 @@ function signatureCard(s) {
 function ghostingCard(s) {
     const longest = (s.ghosting.longest || []).map(g => {
         const h = Math.round(g.minutes / 60);
-        return `<tr data-person="${escapeHtml(g.silenced)}" data-person-b="${escapeHtml(g.revived)}"><td>${escapeHtml(g.silenced)} → ${escapeHtml(g.revived)}</td><td>${h}h</td><td>${fmtDate(g.when)}</td></tr>`;
+        return `<tr data-person="${escapeHtml(g.silenced)}" data-person-b="${escapeHtml(g.revived)}"><td>${escapeHtml(g.silenced)} → ${escapeHtml(g.revived)}</td><td>${t('format.hours', { h })}</td><td>${fmtDate(g.when)}</td></tr>`;
     }).join('');
     const revivers = (s.ghosting.revivers || []).map(([n, c]) => `<tr data-person="${escapeHtml(n)}"><td>${escapeHtml(n)}</td><td>${fmt(c)}</td></tr>`).join('');
     return `
     <section class="dash-card col-6">
-        <h2>Ghosting <span class="dash-meta">${fmt(s.ghosting.count)} silences &gt;24h</span></h2>
-        <h4 class="dash-subheading dash-subheading--first">Plus longs silences</h4>
+        <h2>${t('dash.ghosting')} <span class="dash-meta">${t('dash.ghostingMeta', { n: fmt(s.ghosting.count) })}</span></h2>
+        <h4 class="dash-subheading dash-subheading--first">${t('dash.longestSilences')}</h4>
         <table class="dash-table"><tbody>${longest}</tbody></table>
-        <h4 class="dash-subheading">Qui brise le silence</h4>
+        <h4 class="dash-subheading">${t('dash.whoBreaks')}</h4>
         <table class="dash-table"><tbody>${revivers}</tbody></table>
     </section>`;
 }
 
 function initiatorCard(s) {
-    const rows = s.initiator.map(([n, c]) => `<tr data-person="${escapeHtml(n)}"><td>${escapeHtml(n)}</td><td>${fmt(c)} jours</td></tr>`).join('');
+    const rows = s.initiator.map(([n, c]) => `<tr data-person="${escapeHtml(n)}"><td>${escapeHtml(n)}</td><td>${t('dash.daysValue', { n: fmt(c) })}</td></tr>`).join('');
     return `
     <section class="dash-card col-6">
-        <h2>Qui lance la conversation</h2>
+        <h2>${t('dash.initiator')}</h2>
         <table class="dash-table"><tbody>${rows}</tbody></table>
     </section>`;
 }
@@ -359,12 +385,12 @@ function initiatorCard(s) {
 function sentimentCard(s) {
     const st = s.sentiment;
     const mlBadge = st.mlEnabled
-        ? `<span class="dash-badge">IA (${st.device ?? 'wasm'}${st.ironyModel ? ' + ironie' : ''})</span>`
-        : `<span class="dash-badge dash-badge--dim">lexique seulement</span>`;
+        ? `<span class="dash-badge">${t(st.ironyModel ? 'dash.badgeMLIrony' : 'dash.badgeML', { device: st.device ?? 'wasm' })}</span>`
+        : `<span class="dash-badge dash-badge--dim">${t('dash.badgeLexicon')}</span>`;
 
     const rows = (st.perPerson || []).map(p => {
         const ratePct = (p.rate * 100).toFixed(1);
-        const sampled = p.sampled > 0 ? `<span class="dash-meta-inline" title="${p.sampled} msgs analysés">(${p.sampled})</span>` : '';
+        const sampled = p.sampled > 0 ? `<span class="dash-meta-inline" title="${t('dash.sampledTitle', { n: p.sampled })}">(${p.sampled})</span>` : '';
         return `<tr data-person="${escapeHtml(p.author)}">
             <td>${escapeHtml(p.author)}</td>
             <td>${fmt(p.pos)}</td>
@@ -372,26 +398,34 @@ function sentimentCard(s) {
             <td>${fmt(p.compliment)}</td>
             <td>${fmt(p.insult)}</td>
             <td>${p.rate > 0 ? '+' : ''}${ratePct}% ${sampled}</td>
-            <td>${p.stdDev > 0 ? p.stdDev.toFixed(2) : '—'}</td>
-            <td>${p.sarcasmHits > 0 ? p.sarcasmHits : '—'}</td>
+            <td>${p.stdDev > 0 ? p.stdDev.toFixed(2) : t('common.none')}</td>
+            <td>${p.sarcasmHits > 0 ? p.sarcasmHits : t('common.none')}</td>
         </tr>`;
     }).join('');
 
     const highlights = [];
-    if (st.sweetest?.compliment)  highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">💖</span><div><strong>${escapeHtml(st.sweetest.author)}</strong> est la personne la plus douce (${st.sweetest.compliment} compliments)</div></div>`);
-    if (st.sharpest?.insult)      highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">🌶️</span><div><strong>${escapeHtml(st.sharpest.author)}</strong> pique le plus (${st.sharpest.insult} piques)</div></div>`);
-    if (st.mostPositive)          highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">☀️</span><div><strong>${escapeHtml(st.mostPositive.author)}</strong> a le ton le plus positif (${(st.mostPositive.rate * 100).toFixed(1)}%)</div></div>`);
-    if (st.mostVolatile)          highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">🎢</span><div><strong>${escapeHtml(st.mostVolatile.author)}</strong> est le plus en montagnes russes (σ = ${st.mostVolatile.stdDev.toFixed(2)})</div></div>`);
+    const highlight = (icon, text) =>
+        highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">${icon}</span><div>${text}</div></div>`);
+
+    if (st.sweetest?.compliment)
+        highlight('💖', t('dash.sweetest', { name: escapeHtml(st.sweetest.author), n: st.sweetest.compliment }));
+    if (st.sharpest?.insult)
+        highlight('🌶️', t('dash.sharpest', { name: escapeHtml(st.sharpest.author), n: st.sharpest.insult }));
+    if (st.mostPositive)
+        highlight('☀️', t('dash.mostPositive', { name: escapeHtml(st.mostPositive.author), pct: (st.mostPositive.rate * 100).toFixed(1) }));
+    if (st.mostVolatile)
+        highlight('🎢', t('dash.mostVolatile', { name: escapeHtml(st.mostVolatile.author), sd: st.mostVolatile.stdDev.toFixed(2) }));
     if (st.mostStable && st.perPerson.length > 1)
-                                  highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">🧘</span><div><strong>${escapeHtml(st.mostStable.author)}</strong> est le plus constant (σ = ${st.mostStable.stdDev.toFixed(2)})</div></div>`);
-    if (st.mostBeloved)           highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">💝</span><div><strong>${escapeHtml(st.mostBeloved.author)}</strong> reçoit les réactions les plus chaleureuses (${(st.mostBeloved.reactionsReceivedMean * 100).toFixed(0)}%, ${st.mostBeloved.reactionsReceived} reactions)</div></div>`);
+        highlight('🧘', t('dash.mostStable', { name: escapeHtml(st.mostStable.author), sd: st.mostStable.stdDev.toFixed(2) }));
+    if (st.mostBeloved)
+        highlight('💝', t('dash.mostBeloved', { name: escapeHtml(st.mostBeloved.author), pct: (st.mostBeloved.reactionsReceivedMean * 100).toFixed(0), n: st.mostBeloved.reactionsReceived }));
     if (st.mostExpressive && st.perPerson.length > 1)
-                                  highlights.push(`<div class="dash-fact"><span class="dash-fact-icon">🎭</span><div><strong>${escapeHtml(st.mostExpressive.author)}</strong> réagit le plus souvent (${st.mostExpressive.reactionsSent} réactions émises)</div></div>`);
+        highlight('🎭', t('dash.mostExpressive', { name: escapeHtml(st.mostExpressive.author), n: st.mostExpressive.reactionsSent }));
 
     const hasReactions = (st.perPerson || []).some(p => p.reactionsSent > 0 || p.reactionsReceived > 0);
     const reactionRows = !hasReactions ? '' : (st.perPerson || []).map(p => {
-        const sentPct = p.reactionsSent > 0 ? `${p.reactionsSentMean >= 0 ? '+' : ''}${(p.reactionsSentMean * 100).toFixed(0)}%` : '—';
-        const recPct  = p.reactionsReceived > 0 ? `${p.reactionsReceivedMean >= 0 ? '+' : ''}${(p.reactionsReceivedMean * 100).toFixed(0)}%` : '—';
+        const sentPct = p.reactionsSent > 0 ? `${p.reactionsSentMean >= 0 ? '+' : ''}${(p.reactionsSentMean * 100).toFixed(0)}%` : t('common.none');
+        const recPct  = p.reactionsReceived > 0 ? `${p.reactionsReceivedMean >= 0 ? '+' : ''}${(p.reactionsReceivedMean * 100).toFixed(0)}%` : t('common.none');
         return `<tr data-person="${escapeHtml(p.author)}">
             <td>${escapeHtml(p.author)}</td>
             <td>${fmt(p.reactionsSent)} <span class="dash-meta-inline">${sentPct}</span></td>
@@ -403,40 +437,39 @@ function sentimentCard(s) {
         .sort((a, b) => Math.abs(b[1].mean) - Math.abs(a[1].mean))
         .map(([author, { mean, count }]) => {
             const pct = (mean * 100).toFixed(1);
-            return `<tr data-person="${escapeHtml(author)}"><td>${escapeHtml(author)}</td><td>${mean >= 0 ? '+' : ''}${pct}%</td><td class="dash-meta-inline">${count} signaux</td></tr>`;
+            return `<tr data-person="${escapeHtml(author)}"><td>${escapeHtml(author)}</td><td>${mean >= 0 ? '+' : ''}${pct}%</td><td class="dash-meta-inline">${t('dash.signals', { n: count })}</td></tr>`;
         }).join('');
 
     return `
     <section class="dash-card col-12">
-        <h2>Sentiment & ton ${mlBadge}</h2>
+        <h2>${t('dash.sentiment')} ${mlBadge}</h2>
         <div class="dash-facts dash-facts--spaced">${highlights.join('')}</div>
         <table class="dash-table">
-            <thead><tr><th>Personne</th><th>Positif</th><th>Négatif</th><th>Compliments</th><th>Piques</th><th>Ratio</th><th>σ</th><th>Ironie</th></tr></thead>
+            <thead><tr><th>${t('dash.person')}</th><th>${t('dash.positive')}</th><th>${t('dash.negative')}</th><th>${t('dash.compliments')}</th><th>${t('dash.barbs')}</th><th>${t('dash.ratio')}</th><th>σ</th><th>${t('dash.irony')}</th></tr></thead>
             <tbody>${rows}</tbody>
         </table>
         ${reactionRows ? `
-        <h3 class="dash-section-heading">Réactions emoji</h3>
+        <h3 class="dash-section-heading">${t('dash.emojiReactions')}</h3>
         <table class="dash-table">
-            <thead><tr><th>Personne</th><th>Émises (ton moyen)</th><th>Reçues (ton moyen)</th></tr></thead>
+            <thead><tr><th>${t('dash.person')}</th><th>${t('dash.sent')}</th><th>${t('dash.received')}</th></tr></thead>
             <tbody>${reactionRows}</tbody>
         </table>` : ''}
         ${afterRows ? `
-        <h3 class="dash-section-heading">Influence sur l'ambiance</h3>
+        <h3 class="dash-section-heading">${t('dash.influence')}</h3>
         <table class="dash-table">
-            <thead><tr><th>Après ses messages</th><th>Ambiance des réponses</th><th></th></tr></thead>
+            <thead><tr><th>${t('dash.afterMessages')}</th><th>${t('dash.replyMood')}</th><th></th></tr></thead>
             <tbody>${afterRows}</tbody>
         </table>` : ''}
     </section>`;
 }
 
 function responseCard(s) {
-    const rows = (s.responseStats.all || []).map(([n, min]) => {
-        const txt = min < 60 ? `${min} min` : `${Math.round(min / 60 * 10) / 10} h`;
-        return `<tr data-person="${escapeHtml(n)}"><td>${escapeHtml(n)}</td><td>${txt}</td></tr>`;
-    }).join('');
+    const rows = (s.responseStats.all || []).map(([n, min]) =>
+        `<tr data-person="${escapeHtml(n)}"><td>${escapeHtml(n)}</td><td>${fmtTime(min)}</td></tr>`
+    ).join('');
     return `
     <section class="dash-card col-6">
-        <h2>Temps de réponse</h2>
+        <h2>${t('dash.responseTime')}</h2>
         <table class="dash-table"><tbody>${rows}</tbody></table>
     </section>`;
 }
@@ -445,15 +478,15 @@ function compatibilityCard(s) {
     const c = s.compatibility;
     return `
     <section class="dash-card col-6">
-        <h2>Compatibilité</h2>
+        <h2>${t('dash.compatibility')}</h2>
         <div class="dash-compat">
             <div><span class="dash-compat-score">${c.score}</span><span class="dash-compat-max">/100</span></div>
         </div>
         <dl class="dash-compat-grid">
-            <div class="dash-compat-cell"><dt>Longueurs</dt><dd>${c.components.lengthSimilarity}</dd></div>
-            <div class="dash-compat-cell"><dt>Équilibre</dt><dd>${c.components.volumeBalance}</dd></div>
-            <div class="dash-compat-cell"><dt>Réciprocité</dt><dd>${c.components.reciprocity}</dd></div>
-            <div class="dash-compat-cell"><dt>Régularité</dt><dd>${c.components.consistency}</dd></div>
+            <div class="dash-compat-cell"><dt>${t('dash.lengths')}</dt><dd>${c.components.lengthSimilarity}</dd></div>
+            <div class="dash-compat-cell"><dt>${t('dash.balance')}</dt><dd>${c.components.volumeBalance}</dd></div>
+            <div class="dash-compat-cell"><dt>${t('dash.reciprocity')}</dt><dd>${c.components.reciprocity}</dd></div>
+            <div class="dash-compat-cell"><dt>${t('dash.consistency')}</dt><dd>${c.components.consistency}</dd></div>
         </dl>
     </section>`;
 }
@@ -461,18 +494,18 @@ function compatibilityCard(s) {
 function funFactsCard(s) {
     const facts = [];
     if (s.firstMessage) {
-        facts.push({ i: '🎬', t: `Premier message : <strong>${escapeHtml(s.firstMessage.author)}</strong> le ${fmtDate(s.firstMessage.datetime)} à ${fmtClock(s.firstMessage.datetime)}` });
+        facts.push({ i: '🎬', t: t('dash.firstMessage', { name: escapeHtml(s.firstMessage.author), date: fmtDate(s.firstMessage.datetime), time: fmtClock(s.firstMessage.datetime) }) });
     }
     if (s.longestMessage?.msgLen) {
-        facts.push({ i: '📜', t: `Plus long message : <strong>${escapeHtml(s.longestMessage.author)}</strong> avec ${fmt(s.longestMessage.msgLen)} caractères` });
+        facts.push({ i: '📜', t: t('dash.longestMessage', { name: escapeHtml(s.longestMessage.author), n: fmt(s.longestMessage.msgLen) }) });
     }
-    if (s.nightOwl) facts.push({ i: '🦉', t: `Night owl : <strong>${escapeHtml(s.nightOwl[0])}</strong> (${s.nightOwl[1]} messages entre 0h et 5h)` });
-    if (s.earlyBird) facts.push({ i: '🐦', t: `Early bird : <strong>${escapeHtml(s.earlyBird[0])}</strong> (${s.earlyBird[1]} messages avant 8h)` });
-    if (s.streak?.max) facts.push({ i: '🔥', t: `Meilleur streak : <strong>${s.streak.max} jours</strong> consécutifs` });
+    if (s.nightOwl) facts.push({ i: '🦉', t: t('dash.nightOwl', { name: escapeHtml(s.nightOwl[0]), n: s.nightOwl[1] }) });
+    if (s.earlyBird) facts.push({ i: '🐦', t: t('dash.earlyBird', { name: escapeHtml(s.earlyBird[0]), n: s.earlyBird[1] }) });
+    if (s.streak?.max) facts.push({ i: '🔥', t: t('dash.streak', { n: s.streak.max }) });
     const html = facts.map(f => `<div class="dash-fact"><span class="dash-fact-icon">${f.i}</span><div>${f.t}</div></div>`).join('');
     return `
     <section class="dash-card col-12">
-        <h2>Fun facts</h2>
+        <h2>${t('dash.funFacts')}</h2>
         <div class="dash-facts">${html}</div>
     </section>`;
 }
@@ -490,7 +523,7 @@ function populatePersonFilter(stats) {
     const select = $('#dash-person');
     if (!select) return;
     const names = (stats.ranking || []).map(([name]) => name);
-    select.innerHTML = '<option value="">Tout le monde</option>' +
+    select.innerHTML = `<option value="">${t('common.everyone')}</option>` +
         names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
     select.disabled = names.length === 0;
 }
@@ -527,7 +560,7 @@ function exportJSON() {
     const blob = new Blob([JSON.stringify(current.stats, null, 2)], { type: 'application/json' });
     downloadBlob(blob, 'chatwrap-stats.json');
     track('export', { format: 'json' });
-    showToast('Stats exportées en JSON');
+    showToast(t('dash.jsonDone'));
 }
 
 /**
@@ -556,7 +589,7 @@ function exportCSV() {
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
     downloadBlob(blob, 'chatwrap-participants.csv');
     track('export', { format: 'csv' });
-    showToast('Stats exportées en CSV');
+    showToast(t('dash.csvDone'));
 }
 
 function csvCell(value) {

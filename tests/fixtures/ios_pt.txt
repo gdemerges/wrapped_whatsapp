@@ -1,0 +1,6 @@
+[15/03/2024, 14:30:00] Rita: Bom dia a todos
+[15/03/2024, 14:31:10] João: Tudo bem?
+[16/03/2024, 09:05:00] Rita: imagem ocultada
+[16/03/2024, 09:06:00] João: figurinha omitida
+[17/03/2024, 21:15:00] Rita: Esta mensagem foi apagada
+[17/03/2024, 21:16:00] João: Até amanhã <Esta mensagem foi editada>

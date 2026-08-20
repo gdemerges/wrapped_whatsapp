@@ -9,10 +9,24 @@ import { ensureChart } from './vendor.js';
 import { destroyAllCharts, retintCharts } from './slides/_charts.js';
 import { announce } from './ui/toast.js';
 import { readHash, writeSlide } from './ui/hash.js';
+import { t } from './i18n.js';
 
 const TRANSITION_MS = 500;
 const STORY_BASE_MS = 4600;
 const STORY_MAX_MS = 9000;
+
+/**
+ * Show or hide a slide from assistive tech *and* from the tab order.
+ *
+ * `aria-hidden` alone was not enough: the buttons on the recap slide stayed
+ * focusable while the slide was off-screen, so tabbing from the toolbar landed
+ * on controls nobody could see.
+ */
+function setActive(el, active) {
+    el.setAttribute('aria-hidden', String(!active));
+    if (active) el.removeAttribute('inert');
+    else el.setAttribute('inert', '');
+}
 
 export class Deck {
     /**
@@ -53,10 +67,17 @@ export class Deck {
             el.className = `slide ${slide.gradient}${i === 0 ? ' active' : ''}`;
             el.innerHTML = slide.html;
             el.dataset.index = String(i);
-            el.setAttribute('role', 'group');
+            el.id = `slide-${i}`;
+            // tabpanel rather than a bare group: the progress bar above is a
+            // real tablist, and pairing the two is what lets a screen reader
+            // announce "slide 4 of 30" as a position rather than as a heading.
+            el.setAttribute('role', 'tabpanel');
             el.setAttribute('aria-roledescription', 'slide');
-            el.setAttribute('aria-label', `Slide ${i + 1} sur ${slides.length}`);
-            el.setAttribute('aria-hidden', i === 0 ? 'false' : 'true');
+            // Its own name rather than the tab's: the tab reads "go to slide 4",
+            // which is an instruction, not a title for the panel it opens.
+            el.setAttribute('aria-label', t('deck.slideLabel', { n: i + 1, total: slides.length }));
+            el.tabIndex = -1;
+            setActive(el, i === 0);
             if (slide.chart) el._chartInit = slide.chart;
             frag.appendChild(el);
             this.elements.push(el);
@@ -66,14 +87,21 @@ export class Deck {
             const seg = document.createElement('button');
             seg.className = 'progress-seg';
             seg.type = 'button';
+            seg.id = `slide-tab-${i}`;
             seg.setAttribute('role', 'tab');
-            seg.setAttribute('aria-label', `Aller à la slide ${i + 1}`);
+            seg.setAttribute('aria-label', t('deck.goToSlide', { n: i + 1 }));
+            seg.setAttribute('aria-controls', `slide-${i}`);
             seg.setAttribute('aria-selected', String(i === 0));
+            // Roving tabindex: one Tab stop for the whole bar, arrows move
+            // inside it. Thirty tab stops between the toolbar and the slide
+            // made the deck unusable with a keyboard.
+            seg.tabIndex = i === 0 ? 0 : -1;
             seg.innerHTML = '<span class="progress-fill"></span>';
-            seg.addEventListener('click', () => { this.stopStory(); this.goTo(i); });
+            seg.addEventListener('click', () => { this.stopStory(); this.goTo(i, { focus: true }); });
             progress.appendChild(seg);
         });
         container.appendChild(frag);
+        this.bindTablistKeys();
 
         const requested = readHash().slide;
         const start = requested != null && requested < slides.length ? requested : 0;
@@ -112,7 +140,15 @@ export class Deck {
         el._chartInit(canvas.getContext('2d'), el);
     }
 
-    goTo(index, { immediate = false } = {}) {
+    /**
+     * @param {number} index
+     * @param {{ immediate?: boolean, focus?: boolean }} [options]
+     *   `focus` moves keyboard focus onto the slide — set it when the move came
+     *   from the keyboard or from clicking the progress bar, so the next Tab
+     *   continues from the new slide instead of from wherever focus was left.
+     *   Story mode and swipes deliberately leave focus alone.
+     */
+    goTo(index, { immediate = false, focus = false } = {}) {
         if (index < 0 || index >= this.length || index === this.index) return;
         if (this.animating && !immediate) return;
 
@@ -122,9 +158,9 @@ export class Deck {
 
         if (immediate || this.reducedMotion) {
             from.classList.remove('active');
-            from.setAttribute('aria-hidden', 'true');
+            setActive(from, false);
             to.classList.add('active');
-            to.setAttribute('aria-hidden', 'false');
+            setActive(to, true);
             this.index = index;
         } else {
             this.animating = true;
@@ -132,14 +168,14 @@ export class Deck {
             to.style.transform = forward ? 'translateX(100%)' : 'translateX(-100%)';
             to.style.opacity = '1';
             to.classList.add('active');
-            to.setAttribute('aria-hidden', 'false');
+            setActive(to, true);
             void to.offsetHeight; // force the start position to stick
 
             to.style.transition = '';
             to.style.transform = 'translateX(0)';
             from.style.transform = forward ? 'translateX(-100%)' : 'translateX(100%)';
             from.style.opacity = '0';
-            from.setAttribute('aria-hidden', 'true');
+            setActive(from, false);
 
             setTimeout(() => {
                 from.classList.remove('active');
@@ -152,14 +188,36 @@ export class Deck {
         this.updateChrome(index);
         this.initChart(index);
         this.initChart(index + 1); // pre-warm the next chart so it never pops in
-        announce(`Slide ${index + 1} sur ${this.length}`);
+        announce(t('deck.slideLabel', { n: index + 1, total: this.length }));
         writeSlide(index);
         this.refs.onSlideChange?.(index);
+        if (focus) to.focus({ preventScroll: true });
         if (this.storyPlaying) this.scheduleStory();
     }
 
-    next() { this.index < this.length - 1 ? this.goTo(this.index + 1) : this.stopStory(); }
-    prev() { this.goTo(this.index - 1); }
+    next(options) { this.index < this.length - 1 ? this.goTo(this.index + 1, options) : this.stopStory(); }
+    prev(options) { this.goTo(this.index - 1, options); }
+
+    /**
+     * Arrow keys inside the progress bar move the roving tab stop, matching
+     * what a tablist is expected to do.
+     */
+    bindTablistKeys() {
+        const { progress } = this.refs;
+        if (!progress || progress._keysBound) return;
+        progress._keysBound = true;
+        progress.addEventListener('keydown', (e) => {
+            const delta = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1
+                : e.key === 'Home' ? -this.length : e.key === 'End' ? this.length : 0;
+            if (!delta) return;
+            e.preventDefault();
+            this.stopStory();
+            this.goTo(Math.max(0, Math.min(this.length - 1, this.index + delta)), { focus: true });
+            /** @type {HTMLElement|null} */
+            const seg = progress.querySelector('.progress-seg.current');
+            seg?.focus();
+        });
+    }
 
     updateChrome(index) {
         const { counter, progress } = this.refs;
@@ -168,6 +226,7 @@ export class Deck {
             seg.classList.toggle('seen', i < index);
             seg.classList.toggle('current', i === index);
             seg.setAttribute('aria-selected', String(i === index));
+            seg.tabIndex = i === index ? 0 : -1;
         });
     }
 
@@ -190,10 +249,12 @@ export class Deck {
         if (this.index === this.length - 1) this.goTo(0, { immediate: true });
         this.storyPlaying = true;
         document.body.classList.add('story-playing');
+        announce(t('deck.storyStarted'));
         this.scheduleStory();
     }
 
     stopStory() {
+        if (this.storyPlaying) announce(t('deck.storyStopped'));
         this.storyPlaying = false;
         clearTimeout(this.storyTimer);
         this.storyTimer = null;
@@ -227,10 +288,10 @@ export function bindNavigation(deck, isActive) {
         if (!isActive()) return;
         if (e.target.closest('input, textarea, select, [contenteditable]')) return;
         switch (e.key) {
-            case 'ArrowRight': e.preventDefault(); deck.stopStory(); deck.next(); break;
-            case 'ArrowLeft':  e.preventDefault(); deck.stopStory(); deck.prev(); break;
-            case 'Home':       e.preventDefault(); deck.stopStory(); deck.goTo(0); break;
-            case 'End':        e.preventDefault(); deck.stopStory(); deck.goTo(deck.length - 1); break;
+            case 'ArrowRight': e.preventDefault(); deck.stopStory(); deck.next({ focus: true }); break;
+            case 'ArrowLeft':  e.preventDefault(); deck.stopStory(); deck.prev({ focus: true }); break;
+            case 'Home':       e.preventDefault(); deck.stopStory(); deck.goTo(0, { focus: true }); break;
+            case 'End':        e.preventDefault(); deck.stopStory(); deck.goTo(deck.length - 1, { focus: true }); break;
             case ' ':
                 if (e.target.closest('button')) return; // let Space activate buttons
                 e.preventDefault();

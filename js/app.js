@@ -17,6 +17,13 @@ import { buildDemoBlob } from './demo.js';
 import { escapeHtml } from './utils.js';
 import { TIP_JAR_URL } from './config.js';
 import { track, trackPageview, isEnabled as analyticsEnabled, isOptedOut, setOptOut } from './analytics.js';
+import { fmt } from './format.js';
+import { t, initLocale, setLocale, getLocale, onLocaleChange, applyStaticI18n, LOCALES } from './i18n.js';
+
+// Settled before anything is painted: a slide bakes its text in when it is
+// built, so the language has to be known before the first build.
+initLocale();
+applyStaticI18n();
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -76,9 +83,8 @@ function initTheme() {
 }
 
 function labelThemeBtn(btn, theme) {
-    const label = theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre';
-    btn.setAttribute('aria-label', label);
-    btn.setAttribute('title', theme === 'dark' ? 'Mode clair' : 'Mode sombre');
+    btn.setAttribute('aria-label', t(theme === 'dark' ? 'theme.toLight' : 'theme.toDark'));
+    btn.setAttribute('title', t(theme === 'dark' ? 'theme.light' : 'theme.dark'));
 }
 
 // ========== AI toggle ==========
@@ -118,7 +124,8 @@ function callWorker(message, transfer = []) {
             w.removeEventListener('message', onMessage);
             w.removeEventListener('error', onError);
             if (e.data.kind === 'error') {
-                const err = new Error(e.data.message);
+                // The worker names the failure; the page words it.
+                const err = new Error(e.data.code ? t(`error.${e.data.code}`) : e.data.message);
                 err.diagnostics = e.data.diagnostics;
                 reject(err);
             } else {
@@ -128,7 +135,7 @@ function callWorker(message, transfer = []) {
         const onError = (e) => {
             w.removeEventListener('message', onMessage);
             w.removeEventListener('error', onError);
-            reject(new Error(e.message || 'Le calcul a échoué'));
+            reject(new Error(e.message || t('error.computeFailed')));
         };
         w.addEventListener('message', onMessage);
         w.addEventListener('error', onError);
@@ -184,17 +191,17 @@ $('#error-retry').addEventListener('click', () => {
 });
 
 function runDemo() {
-    showToast('Conversation d\'exemple — données fictives');
+    showToast(t('upload.demoNotice'));
     handleBlob(buildDemoBlob(), { demo: true });
 }
 
 async function handleFile(file) {
     if (file.size > MAX_FILE_SIZE) {
-        showFatal(`Fichier trop volumineux (max ${Math.round(MAX_FILE_SIZE / 1024 / 1024)} Mo).`);
+        showFatal(t('error.tooBig', { mb: Math.round(MAX_FILE_SIZE / 1024 / 1024) }));
         return;
     }
     if (!/\.(txt|zip)$/i.test(file.name)) {
-        showFatal('Formats acceptés : .txt et .zip (l\'export WhatsApp, tel quel).');
+        showFatal(t('error.badExt'));
         return;
     }
 
@@ -210,14 +217,14 @@ async function handleFile(file) {
 
 async function handleBlob(blob, { demo = false } = {}) {
     showScreen('loading');
-    announce('Analyse en cours');
+    announce(t('loading.announce'));
     // Likely needed within seconds; warmed here so the first chart slide and
     // the first share don't pay for the round-trip.
     preload('chart');
 
     try {
         const info = await callWorker({ kind: 'load', blob });
-        if (info.kind !== 'years') throw new Error('Réponse worker invalide');
+        if (info.kind !== 'years') throw new Error(t('error.workerInvalid'));
 
         periodOptions = { years: info.years, yearCounts: info.yearCounts, bounds: info.bounds };
         period = { year: info.years.length === 1 ? info.years[0] : null, range: null };
@@ -238,9 +245,9 @@ async function handleBlob(blob, { demo = false } = {}) {
 
 async function computeAndShow() {
     showScreen('loading');
-    loadingStatus.textContent = 'Calcul des stats...';
+    loadingStatus.textContent = t('loading.computing');
     const result = await callWorker({ kind: 'stats', year: period.year, range: period.range, ai: useAI() });
-    if (result.kind !== 'stats') throw new Error('Calcul échoué');
+    if (result.kind !== 'stats') throw new Error(t('error.computeFailed'));
 
     sessionStorage.removeItem(SESSION_KEY); // drop stats from a previous analysis
     present(rehydrateDates(result.stats), result.comparison);
@@ -249,23 +256,23 @@ async function computeAndShow() {
 }
 
 async function unzip(file) {
-    loadingStatus.textContent = 'Décompression...';
+    loadingStatus.textContent = t('loading.unzipping');
     await ensureJSZip();
     const zip = await window.JSZip.loadAsync(file);
     const entry = Object.values(zip.files).find(f => !f.dir && f.name.toLowerCase().endsWith('.txt'));
-    if (!entry) throw new Error('Aucun fichier .txt trouvé dans le ZIP.');
+    if (!entry) throw new Error(t('error.noTxtInZip'));
 
     // The 50 MB cap applies to the *compressed* file; a small zip can inflate
     // to gigabytes. Check the declared size first, then the real one.
     const declared = entry._data?.uncompressedSize;
     if (typeof declared === 'number' && declared > MAX_FILE_SIZE) {
-        throw new Error(`Fichier décompressé trop volumineux (max ${Math.round(MAX_FILE_SIZE / 1024 / 1024)} Mo).`);
+        throw new Error(t('error.unzippedTooBig', { mb: Math.round(MAX_FILE_SIZE / 1024 / 1024) }));
     }
     const blob = await entry.async('blob', (meta) => {
-        loadingStatus.textContent = `Décompression... ${Math.round(meta.percent)}%`;
+        loadingStatus.textContent = t('loading.unzippingPct', { pct: Math.round(meta.percent) });
     });
     if (blob.size > MAX_FILE_SIZE) {
-        throw new Error(`Fichier décompressé trop volumineux (max ${Math.round(MAX_FILE_SIZE / 1024 / 1024)} Mo).`);
+        throw new Error(t('error.unzippedTooBig', { mb: Math.round(MAX_FILE_SIZE / 1024 / 1024) }));
     }
     return blob;
 }
@@ -278,7 +285,7 @@ function present(stats, comparison) {
     wireRecapActions();
     updatePeriodButton();
     showScreen('wrapped');
-    announce(`${stats.totalMessages} messages analysés`);
+    announce(t('deck.analysed', { n: fmt(stats.totalMessages) }));
 }
 
 /** The last slide offers the same actions as the toolbar, at thumb height. */
@@ -290,13 +297,13 @@ function wireRecapActions() {
     const share = document.createElement('button');
     share.type = 'button';
     share.className = 'file-btn';
-    share.textContent = 'Partager';
+    share.textContent = t('deck.recapShare');
     share.addEventListener('click', openShare);
 
     const again = document.createElement('button');
     again.type = 'button';
     again.className = 'ghost-btn';
-    again.textContent = 'Analyser une autre conversation';
+    again.textContent = t('deck.recapAgain');
     again.addEventListener('click', resetAll);
 
     host.append(share, again);
@@ -315,7 +322,7 @@ function updatePeriodButton() {
     btn.hidden = false;
     label.textContent = period.range
         ? `${period.range.from.slice(0, 10)} → ${period.range.to.slice(0, 10)}`
-        : (period.year == null ? 'Toutes les années' : String(period.year));
+        : (period.year == null ? t('toolbar.periodAll') : String(period.year));
 }
 
 // ========== Toolbar ==========
@@ -323,13 +330,17 @@ $('#nav-prev').addEventListener('click', () => { deck.stopStory(); deck.prev(); 
 $('#nav-next').addEventListener('click', () => { deck.stopStory(); deck.next(); });
 bindNavigation(deck, () => screens.wrapped.classList.contains('active'));
 
-$('#story-toggle').addEventListener('click', (e) => {
-    const playing = deck.toggleStory();
-    const btn = e.currentTarget;
+$('#story-toggle').addEventListener('click', () => {
+    syncStoryButton(deck.toggleStory());
+});
+
+function syncStoryButton(playing = deck.storyPlaying) {
+    const btn = $('#story-toggle');
+    if (!btn) return;
     btn.setAttribute('aria-pressed', String(playing));
     btn.querySelector('span[aria-hidden]').textContent = playing ? '❚❚' : '▶';
-    btn.querySelector('.toolbar-label').textContent = playing ? 'Pause' : 'Lecture auto';
-});
+    btn.querySelector('.toolbar-label').textContent = t(playing ? 'toolbar.storyPause' : 'toolbar.story');
+}
 
 $('#period-btn').addEventListener('click', async () => {
     if (!periodOptions) return;
@@ -386,7 +397,7 @@ $('#summary-btn').addEventListener('click', () => {
         }));
     } catch (err) {
         console.error('Failed to save stats:', err);
-        showError('Impossible d\'ouvrir le dashboard (stockage plein ?)');
+        showError(t('error.dashboardStorage'));
         return;
     }
     window.location.href = 'dashboard.html';
@@ -405,14 +416,14 @@ function showFatal(message, diagnostics = null) {
 
     if (diagnostics) {
         const samples = diagnostics.samples.length
-            ? `<p class="diag-label">Premières lignes non reconnues (contenu masqué) :</p>
+            ? `<p class="diag-label">${t('error.diagIntro')}</p>
                <ul class="diag-samples">${diagnostics.samples.map(s => `<li><code>${escapeHtml(s)}</code></li>`).join('')}</ul>`
             : '';
         box.innerHTML = `
             <dl class="diag-grid">
-                <div><dt>Lignes lues</dt><dd>${diagnostics.totalLines.toLocaleString('fr-FR')}</dd></div>
-                <div><dt>Format détecté</dt><dd>${diagnostics.detected ? 'oui' : 'non'}</dd></div>
-                <div><dt>Lignes reconnues</dt><dd>${diagnostics.matched}</dd></div>
+                <div><dt>${t('error.diagLines')}</dt><dd>${fmt(diagnostics.totalLines)}</dd></div>
+                <div><dt>${t('error.diagDetected')}</dt><dd>${t(diagnostics.detected ? 'common.yes' : 'common.no')}</dd></div>
+                <div><dt>${t('error.diagMatched')}</dt><dd>${diagnostics.matched}</dd></div>
             </dl>
             ${samples}`;
         box.hidden = false;
@@ -421,7 +432,7 @@ function showFatal(message, diagnostics = null) {
         box.innerHTML = '';
     }
 
-    announce(`Erreur : ${message}`);
+    announce(t('error.prefix', { message }));
     showScreen('error');
 }
 
@@ -445,7 +456,7 @@ async function restore() {
             }
         } catch (err) {
             console.error('Failed to load shared data:', err);
-            showToast('Ce lien de partage est illisible', { error: true });
+            showToast(t('error.unreadableLink'), { error: true });
         }
     }
     try {
@@ -461,10 +472,54 @@ async function restore() {
     return false;
 }
 
+initLangPicker();
+syncStoryButton(false);
 renderPrivacyNote();
 renderTipJar();
 trackPageview();
 restore();
+
+/**
+ * The language picker.
+ *
+ * Options are built from `LOCALES` rather than written in the HTML, so a new
+ * dictionary shows up in the menu the moment it is registered.
+ */
+function initLangPicker() {
+    const select = $('#lang-select');
+    if (!select) return;
+    select.innerHTML = Object.values(LOCALES)
+        .map(l => `<option value="${l.code}">${escapeHtml(l.label)}</option>`).join('');
+    select.value = getLocale();
+    select.addEventListener('change', () => setLocale(select.value));
+}
+
+/**
+ * Repaint everything the language touches.
+ *
+ * The static HTML is re-translated in place, but a deck cannot be: each slide
+ * is a string of HTML built once from the stats. It is rebuilt from the same
+ * stats and re-mounted, and `mount` restores the slide recorded in the hash —
+ * so changing language mid-deck leaves you on the slide you were reading.
+ */
+onLocaleChange(() => {
+    applyStaticI18n();
+    const themeBtn = $('#theme-toggle');
+    if (themeBtn) labelThemeBtn(themeBtn, document.documentElement.dataset.theme);
+    const picker = $('#lang-select');
+    if (picker) picker.value = getLocale();
+    renderPrivacyNote();
+    const tip = document.querySelector('.tip-link');
+    if (tip) tip.textContent = t('upload.tipJar');
+    syncStoryButton();
+    updatePeriodButton();
+
+    if (!session) return;
+    deck.stopStory();
+    session.slides = generateSlides(session.stats, session.comparison);
+    deck.mount(session.slides);
+    wireRecapActions();
+});
 
 /**
  * The note has to stay true in both states: claiming "rien n'est envoyé à un
@@ -475,8 +530,7 @@ function renderPrivacyNote() {
     const note = $('.privacy-note');
     if (!note) return;
 
-    const base = 'Tes données restent sur ton appareil. Ta conversation n\'est jamais envoyée : '
-        + 'elle est lue et analysée dans ce navigateur.';
+    const base = t('upload.privacy');
 
     if (!analyticsEnabled() && !isOptedOut()) {
         note.textContent = base;
@@ -488,11 +542,11 @@ function renderPrivacyNote() {
     const extra = document.createElement('span');
     extra.className = 'privacy-note-extra';
     if (isOptedOut()) {
-        extra.append('Mesure d\'audience désactivée. ');
-        extra.append(makeToggle('Réactiver', false));
+        extra.append(t('upload.privacyOptedOut'));
+        extra.append(makeToggle(t('upload.optIn'), false));
     } else {
-        extra.append('Un compteur anonyme enregistre les fonctionnalités utilisées — jamais le contenu de tes messages. ');
-        extra.append(makeToggle('Ne pas participer', true));
+        extra.append(t('upload.privacyCounter'));
+        extra.append(makeToggle(t('upload.optOut'), true));
     }
     note.append(extra);
 }
@@ -505,7 +559,7 @@ function makeToggle(label, optOut) {
     btn.addEventListener('click', () => {
         setOptOut(optOut);
         renderPrivacyNote();
-        showToast(optOut ? 'Mesure d\'audience désactivée' : 'Mesure d\'audience réactivée');
+        showToast(t(optOut ? 'upload.optOutDone' : 'upload.optInDone'));
     });
     return btn;
 }
@@ -520,7 +574,7 @@ function renderTipJar() {
     link.href = TIP_JAR_URL;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
-    link.textContent = '☕ Ce site est gratuit — offrir un café';
+    link.textContent = t('upload.tipJar');
     link.addEventListener('click', () => track('tip_jar'));
     host.appendChild(link);
 }

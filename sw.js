@@ -16,7 +16,7 @@
  * ML model weights (huggingface.co) are left alone: hundreds of megabytes,
  * already cached internally by transformers.js.
  */
-const CACHE_NAME = 'ww-shell-v6';
+const CACHE_NAME = 'ww-shell-v7';
 
 const SHELL_ASSETS = [
     'index.html',
@@ -38,6 +38,8 @@ const SHELL_ASSETS = [
     'js/payload.js',
     'js/cache.js',
     'js/utils.js',
+    'js/format.js',
+    'js/i18n.js',
     'js/vendor.js',
     'js/anonymize.js',
     'js/analytics.js',
@@ -69,6 +71,9 @@ const SHELL_ASSETS = [
     'js/slides/network.js',
     'js/slides/profiles.js',
     'js/lang/stopwords.js',
+    'js/lang/chat-locales.js',
+    'js/lang/ui/fr.js',
+    'js/lang/ui/en.js',
     'js/lang/sentiment.js',
     'js/worker/sentiment-ml.js',
     'js/worker/sentiment-config.js',

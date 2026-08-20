@@ -6,8 +6,8 @@
  */
 import { openDialog } from './dialog.js';
 import { escapeHtml } from '../utils.js';
-
-const fmtCount = (n) => Number(n).toLocaleString('fr-FR');
+import { fmt } from '../format.js';
+import { t } from '../i18n.js';
 
 /**
  * @param {{ years: number[], yearCounts: Record<string, number>,
@@ -24,47 +24,47 @@ export function pickPeriod({ years, yearCounts, bounds, current = { year: null, 
     const yearButtons = years.map(y => `
         <button class="period-option ${current.year === y ? 'is-current' : ''}" data-year="${y}">
             <span class="period-value">${y}</span>
-            <span class="period-count">${fmtCount(yearCounts[y])} messages</span>
+            <span class="period-count">${t('period.messages', { n: fmt(yearCounts[y]) })}</span>
         </button>`).join('');
 
     const html = `
         <div class="dialog-panel period-panel">
-            <h2 class="dialog-title">Quelle période analyser ?</h2>
+            <h2 class="dialog-title">${t('period.title')}</h2>
             <div class="tab-bar" role="tablist">
-                <button class="tab-btn active" role="tab" aria-selected="true" data-tab="years" data-autofocus>Par année</button>
-                <button class="tab-btn" role="tab" aria-selected="false" data-tab="range">Période libre</button>
+                <button class="tab-btn active" role="tab" aria-selected="true" data-tab="years" data-autofocus>${t('period.tabYears')}</button>
+                <button class="tab-btn" role="tab" aria-selected="false" data-tab="range">${t('period.tabRange')}</button>
             </div>
 
             <div class="tab-panel" data-panel="years">
                 <div class="period-options">
                     ${yearButtons}
                     <button class="period-option period-option-all ${current.year === null && !current.range ? 'is-current' : ''}" data-year="all">
-                        <span class="period-value">Toutes les années</span>
-                        <span class="period-count">${fmtCount(total)} messages</span>
+                        <span class="period-value">${t('period.allYears')}</span>
+                        <span class="period-count">${t('period.messages', { n: fmt(total) })}</span>
                     </button>
                 </div>
             </div>
 
             <div class="tab-panel" data-panel="range" hidden>
                 <label class="field">
-                    <span>Du</span>
+                    <span>${t('period.from')}</span>
                     <input type="date" id="range-from" min="${minDate}" max="${maxDate}"
                            value="${escapeHtml(current.range?.from?.slice(0, 10) || minDate)}">
                 </label>
                 <label class="field">
-                    <span>Au</span>
+                    <span>${t('period.to')}</span>
                     <input type="date" id="range-to" min="${minDate}" max="${maxDate}"
                            value="${escapeHtml(current.range?.to?.slice(0, 10) || maxDate)}">
                 </label>
                 <p class="field-error" id="range-error" role="alert" hidden></p>
-                <button class="file-btn" id="range-apply">Analyser cette période</button>
+                <button class="file-btn" id="range-apply">${t('period.apply')}</button>
             </div>
 
-            <button class="dialog-dismiss" data-dismiss aria-label="Fermer">Annuler</button>
+            <button class="dialog-dismiss" data-dismiss aria-label="${t('common.close')}">${t('common.cancel')}</button>
         </div>`;
 
     return openDialog({
-        label: 'Choisir une période',
+        label: t('period.dialog'),
         className: 'period-dialog',
         html,
         onMount(root, close) {
@@ -92,8 +92,8 @@ export function pickPeriod({ years, yearCounts, bounds, current = { year: null, 
             const to = root.querySelector('#range-to');
             const error = root.querySelector('#range-error');
             root.querySelector('#range-apply').addEventListener('click', () => {
-                if (!from.value || !to.value) return fail('Choisis une date de début et de fin.');
-                if (from.value > to.value) return fail('La date de début doit précéder la date de fin.');
+                if (!from.value || !to.value) return fail(t('period.needBoth'));
+                if (from.value > to.value) return fail(t('period.badOrder'));
                 error.hidden = true;
                 close({
                     year: null,

@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils.js';
+import { t } from '../i18n.js';
 import { CHART_COLORS } from './_constants.js';
 
 export function topWordsSlide(stats, gradient) {
@@ -13,8 +14,8 @@ export function topWordsSlide(stats, gradient) {
         gradient,
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Vocabulaire</span>
-                <h2 class="slide-title">Les mots les plus utilisés</h2>
+                <span class="slide-tag">${t('slide.words.tag')}</span>
+                <h2 class="slide-title">${t('slide.words.title')}</h2>
                 <div class="words-cloud">${wordTags}</div>
             </div>
         `,
@@ -33,9 +34,9 @@ export function uniqueWordsSlide(stats, gradient) {
         gradient,
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Signature</span>
-                <h2 class="slide-title">Les mots de chacun</h2>
-                <p class="slide-subtitle">Mots utilisés uniquement par une seule personne</p>
+                <span class="slide-tag">${t('slide.unique.tag')}</span>
+                <h2 class="slide-title">${t('slide.unique.title')}</h2>
+                <p class="slide-subtitle">${t('slide.unique.subtitle')}</p>
                 <div class="uniq-grid">${blocks}</div>
             </div>
         `,

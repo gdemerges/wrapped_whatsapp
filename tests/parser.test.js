@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { parse, detectPattern, parseDate, cleanLine, inferDateOrder, diagnose } from '../js/parser.js';
+import {
+    parse, detectPattern, parseDate, cleanLine, inferDateOrder, diagnose,
+    createStreamParser, stripInvisible,
+} from '../js/parser.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixture = (name) => readFileSync(resolve(__dirname, 'fixtures', name), 'utf-8');
@@ -145,5 +148,154 @@ describe('parser', () => {
         expect(d.detected).toBe(false);
         expect(d.totalLines).toBe(2);
         expect(d.samples.join(' ')).not.toContain('secret');
+    });
+});
+
+describe('parser — languages beyond FR/EN', () => {
+    it('parses iOS PT exports, media and deletions included', () => {
+        const messages = parse(fixture('ios_pt.txt'));
+        expect(messages.length).toBe(6);
+        expect(messages[0].author).toBe('Rita');
+        expect(messages.filter(m => m.isMedia).length).toBe(2);
+        expect(messages.filter(m => m.isDeleted).length).toBe(1);
+        expect(messages.filter(m => m.isEdited).length).toBe(1);
+    });
+
+    it('parses Android IT exports', () => {
+        const messages = parse(fixture('android_it.txt'));
+        expect(messages.length).toBe(6);
+        expect(messages[0].author).toBe('Giulia');
+        expect(messages.filter(m => m.isMedia).length).toBe(2);
+        expect(messages.filter(m => m.isDeleted).length).toBe(1);
+    });
+
+    it('parses Android NL exports with dashed dates', () => {
+        const messages = parse(fixture('android_nl.txt'));
+        expect(messages.length).toBe(6);
+        expect(messages[0].author).toBe('Sanne');
+        expect(messages[0].datetime.getDate()).toBe(15);
+        expect(messages[0].datetime.getMonth()).toBe(2);
+        expect(messages.filter(m => m.isMedia).length).toBe(2);
+    });
+
+    it('tolerates en and em dashes as the Android separator', () => {
+        const text = [
+            '15/03/2024, 14:30 – Alice: one',
+            '15/03/2024, 14:31 — Bob: two',
+            '15/03/2024, 14:32 – Alice: three',
+        ].join('\n');
+        expect(parse(text).length).toBe(3);
+    });
+});
+
+describe('parser — real-world quirks', () => {
+    it('strips bidi marks from authors and bodies, and keeps polls whole', () => {
+        const messages = parse(fixture('ios_quirks.txt'));
+        // The encryption notice has no author and must not survive.
+        expect(messages.map(m => m.author)).toEqual(['Alice', 'Bob', 'Alice']);
+        expect(messages[0].message).toBe('Hey there');
+        expect(messages[2].message).toBe('ok');
+        const poll = messages.find(m => m.isPoll);
+        expect(poll.author).toBe('Bob');
+        expect(poll.message).toContain('On se voit quand ?');
+        expect(poll.message).toContain('OPTION : dimanche');
+    });
+
+    it('keeps the emoji glue that stripInvisible must not touch', () => {
+        expect(stripInvisible('a‎b')).toBe('ab');
+        expect(stripInvisible('👩‍👩‍👧'))
+            .toBe('👩‍👩‍👧');
+    });
+
+    it('keeps a message whose text merely resembles a group notice', () => {
+        // "a ajouté" is a system phrase *and* ordinary French. Only author-less
+        // lines are notices, so this one is a message like any other.
+        const text = [
+            '[15/03/2024 10:00:00] Alice: hello',
+            '[15/03/2024 10:01:00] Bob: Elle a ajouté du sucre dans le café',
+            '[15/03/2024 10:02:00] Alice: hi',
+        ].join('\n');
+        const msgs = parse(text);
+        expect(msgs.length).toBe(3);
+        expect(msgs[1].message).toContain('sucre');
+    });
+
+    it('blanks a deleted message rather than counting its tombstone as text', () => {
+        const text = [
+            '[15/03/2024 10:00:00] Alice: hello there',
+            '[15/03/2024 10:01:00] Bob: This message was deleted',
+            '[15/03/2024 10:02:00] Alice: hi',
+        ].join('\n');
+        const msgs = parse(text);
+        expect(msgs[1].isDeleted).toBe(true);
+        expect(msgs[1].message).toBe('');
+        expect(msgs[1].msgLen).toBe(0);
+    });
+});
+
+describe('parser — streaming', () => {
+    const source = [
+        '[15/03/2024 10:00:00] Alice: hello',
+        '[15/03/2024 10:01:00] Bob: multi',
+        'line message',
+        '[15/03/2024 10:02:00] Alice: bye',
+    ].join('\n');
+
+    /** Feed the same text in `size`-character slices. */
+    const streamed = (text, size) => {
+        const p = createStreamParser();
+        for (let i = 0; i < text.length; i += size) p.push(text.slice(i, i + size));
+        return p.end();
+    };
+
+    it('gives the same result whatever the chunk boundaries', () => {
+        const whole = parse(source);
+        for (const size of [1, 3, 7, 31, 1000]) {
+            const chunked = streamed(source, size);
+            expect(chunked.length).toBe(whole.length);
+            expect(chunked.map(m => m.message)).toEqual(whole.map(m => m.message));
+            expect(chunked.map(m => m.datetime.getTime()))
+                .toEqual(whole.map(m => m.datetime.getTime()));
+        }
+    });
+
+    it('settles the day/month order across chunk boundaries', () => {
+        const text = [
+            '[03/25/2024 10:00:00] Alice: one',
+            '[03/26/2024 10:01:00] Bob: two',
+            '[03/27/2024 10:02:00] Alice: three',
+        ].join('\n');
+        const msgs = streamed(text, 5);
+        expect(msgs[0].datetime.getMonth()).toBe(2);
+        expect(msgs[0].datetime.getDate()).toBe(25);
+    });
+
+    it('carries diagnostics on the thrown error, without a second pass', () => {
+        const p = createStreamParser();
+        p.push('coucou tout le monde\nceci est un secret');
+        let caught = null;
+        try { p.end(); } catch (err) { caught = err; }
+        expect(caught).toBeTruthy();
+        expect(caught.diagnostics.detected).toBe(false);
+        expect(caught.diagnostics.totalLines).toBe(2);
+        expect(caught.diagnostics.samples.join(' ')).not.toContain('secret');
+    });
+});
+
+describe('the demo conversation', () => {
+    it('round-trips through the parser in every interface language', async () => {
+        const { buildDemoBlob } = await import('../js/demo.js');
+        const { LOCALES, setLocale } = await import('../js/i18n.js');
+
+        for (const code of Object.keys(LOCALES)) {
+            setLocale(code);
+            const messages = parse(await buildDemoBlob().text());
+            expect(messages.length, code).toBeGreaterThan(2000);
+            expect(new Set(messages.map(m => m.author)).size, code).toBe(4);
+            expect(messages.filter(m => m.isMedia).length, code).toBeGreaterThan(50);
+            expect(messages.filter(m => m.isReaction).length, code).toBeGreaterThan(10);
+            expect(messages.every(m => !isNaN(m.datetime.getTime())), code).toBe(true);
+        }
+        setLocale('fr');
     });
 });

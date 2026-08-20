@@ -1,3 +1,5 @@
+import { getLocale } from './i18n.js';
+
 /**
  * A synthetic WhatsApp export, generated on demand.
  *
@@ -8,23 +10,53 @@
  * looks the same every time it is shown.
  */
 
-const PEOPLE = ['Camille', 'Léo', 'Sofia', 'Mehdi'];
-
-const PHRASES = [
-    'ça marche pour moi', 'je suis en route', 'on se dit ça demain',
-    'trop drôle 😂', "j'ai adoré le concert", 'quelqu\'un a des nouvelles ?',
-    'je ramène le dessert', 'on part à quelle heure ?', 'bien noté merci',
-    'jamais de la vie 😅', 'regardez ça https://www.youtube.com/watch?v=demo',
-    'article intéressant https://www.lemonde.fr/article-demo',
-    'photo du weekend https://www.instagram.com/p/demo',
-    'je peux pas ce soir désolé', 'on fait comme la dernière fois',
-    'félicitations 🎉🎉', 'sérieux ?? 😱', 'parfait, à tout à l\'heure',
-    'je vous rappelle après la réunion', 'bonne nuit tout le monde 🌙',
-    'quelqu\'un veut un café ?', 'ça me va complètement',
-    'je crois que je suis en retard', 'trop hâte ! 🔥',
-];
-
-const MEDIA = ['image absente', 'sticker omis', 'vidéo absente', 'audio omis'];
+/**
+ * The sample conversation, in each language the interface speaks.
+ *
+ * A French demo shown to an English visitor is worse than no demo: the word
+ * cloud, the signature words and the "who says what" slides are all built from
+ * this text, so they would read as gibberish. The media placeholders and the
+ * reaction verb are the ones WhatsApp itself writes in that language, so the
+ * generated file goes through `parser.js` exactly like a real export would.
+ */
+const SAMPLES = {
+    fr: {
+        people: ['Camille', 'Léo', 'Sofia', 'Mehdi'],
+        media: ['image absente', 'sticker omis', 'vidéo absente', 'audio omis'],
+        reacted: 'a réagi',
+        phrases: [
+            'ça marche pour moi', 'je suis en route', 'on se dit ça demain',
+            'trop drôle 😂', "j'ai adoré le concert", "quelqu'un a des nouvelles ?",
+            'je ramène le dessert', 'on part à quelle heure ?', 'bien noté merci',
+            'jamais de la vie 😅', 'regardez ça https://www.youtube.com/watch?v=demo',
+            'article intéressant https://www.lemonde.fr/article-demo',
+            'photo du weekend https://www.instagram.com/p/demo',
+            'je peux pas ce soir désolé', 'on fait comme la dernière fois',
+            'félicitations 🎉🎉', 'sérieux ?? 😱', "parfait, à tout à l'heure",
+            'je vous rappelle après la réunion', 'bonne nuit tout le monde 🌙',
+            "quelqu'un veut un café ?", 'ça me va complètement',
+            'je crois que je suis en retard', 'trop hâte ! 🔥',
+        ],
+    },
+    en: {
+        people: ['Camille', 'Leo', 'Sofia', 'Mehdi'],
+        media: ['image omitted', 'sticker omitted', 'video omitted', 'audio omitted'],
+        reacted: 'reacted',
+        phrases: [
+            'works for me', "I'm on my way", "let's talk tomorrow",
+            'so funny 😂', 'I loved that concert', 'has anyone heard anything?',
+            'I can bring dessert', 'what time are we leaving?', 'noted, thanks',
+            'absolutely not 😅', 'look at this https://www.youtube.com/watch?v=demo',
+            'interesting piece https://www.theguardian.com/article-demo',
+            'weekend photo https://www.instagram.com/p/demo',
+            "sorry, I can't tonight", 'same as last time then',
+            'congratulations 🎉🎉', 'seriously?? 😱', 'perfect, see you shortly',
+            "I'll call you after the meeting", 'good night everyone 🌙',
+            'anyone want a coffee?', 'that works for me completely',
+            'I think I am running late', 'so excited! 🔥',
+        ],
+    },
+};
 
 /** Mulberry32 — tiny seeded PRNG, so the demo is byte-identical every run. */
 function rng(seed) {
@@ -40,13 +72,16 @@ function rng(seed) {
 const pad = (n) => String(n).padStart(2, '0');
 
 /**
- * Build a 14-month, four-person conversation in the iOS FR export format.
+ * Build a 14-month, four-person conversation in the iOS export format, in the
+ * language the interface is currently showing.
  * Volume follows a seasonal curve with a clear peak, so the chapter detection
  * and the heatmap have something real to show.
  *
  * @returns {Blob} Same shape as a file the user would drop in.
  */
 export function buildDemoBlob() {
+    const sample = SAMPLES[getLocale()] || SAMPLES.fr;
+    const { people: PEOPLE, phrases: PHRASES, media: MEDIA } = sample;
     const random = rng(20240315);
     const lines = [];
     const start = new Date(2024, 0, 1);
@@ -77,7 +112,7 @@ export function buildDemoBlob() {
             const reactor = PEOPLE[Math.floor(random() * PEOPLE.length)];
             lines.push(
                 `[${pad(date.getDate())}/${pad(month + 1)}/${date.getFullYear()} 21:00:00] ` +
-                `${reactor}: a réagi ❤️ à « ${PHRASES[0]} »`,
+                `${reactor}: ${sample.reacted} ❤️ « ${PHRASES[0]} »`,
             );
         }
     }

@@ -328,6 +328,12 @@ html, body {
     will-change: transform, opacity;
 }
 
+/* Belt and braces for the browsers that don't implement `inert`: an off-screen
+   slide must not swallow a click meant for the slide underneath it. */
+.slide[inert] {
+    pointer-events: none;
+}
+
 .slide-inner {
     max-width: 700px;
     width: 100%;
@@ -971,6 +977,36 @@ body.dragging-file::after {
 .theme-toggle:hover {
     transform: scale(1.08);
     background: var(--surface-border);
+}
+
+/* The language picker sits beside the theme toggle, in the same fixed corner.
+   Both are chrome that must stay reachable on every screen, and neither
+   belongs to the content flow. */
+.lang-picker {
+    position: fixed;
+    bottom: 1rem;
+    right: 3.6rem;
+    z-index: 101;
+}
+
+.lang-picker select {
+    height: 38px;
+    padding: 0 0.6rem;
+    border-radius: 19px;
+    background: var(--surface);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid var(--surface-border);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    appearance: none;
+    text-align: center;
+}
+
+.lang-picker select:hover {
+    background: var(--surface-strong, var(--surface));
 }
 
 .theme-toggle:focus-visible {

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'">
     <meta name="referrer" content="no-referrer">
-    <title>Dashboard · Chatwrap</title>
+    <title data-i18n="meta.titleDashboard">Dashboard · Chatwrap</title>
     <meta name="description" content="Chatwrap — dashboard complet des statistiques de ta conversation WhatsApp, 100% dans ton navigateur.">
     <meta name="theme-color" content="#0a0a0a">
     <meta property="og:type" content="website">
@@ -24,41 +24,45 @@
     <link rel="stylesheet" href="css/dashboard.css?v=3">
 </head>
 <body class="dashboard-body">
-    <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Changer le thème" title="Changer le thème">
+    <label class="lang-picker">
+        <span class="sr-only" data-i18n="lang.label">Langue</span>
+        <select id="lang-select"></select>
+    </label>
+    <button id="theme-toggle" class="theme-toggle" type="button" data-i18n-attr="aria-label:theme.toggle; title:theme.toggle" aria-label="Changer le thème" title="Changer le thème">
         <svg class="theme-icon-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
         <svg class="theme-icon-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
     </button>
 
     <header class="dash-header">
-        <a href="index.html" class="dash-back" aria-label="Retour aux slides">
+        <a href="index.html" class="dash-back" data-i18n-attr="aria-label:dash.backAria" aria-label="Retour aux slides">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            <span>Slides</span>
+            <span data-i18n="dash.back">Slides</span>
         </a>
-        <h1 class="dash-title">Dashboard</h1>
+        <h1 class="dash-title" data-i18n="dash.title">Dashboard</h1>
         <div class="dash-tools">
             <label class="dash-filter">
-                <span class="sr-only">Filtrer par participant</span>
+                <span class="sr-only" data-i18n="dash.filter">Filtrer par participant</span>
                 <select id="dash-person" disabled>
-                    <option value="">Tout le monde</option>
+                    <option value="" data-i18n="common.everyone">Tout le monde</option>
                 </select>
             </label>
-            <button id="dash-export-csv" class="dash-action" type="button" aria-label="Exporter en CSV">
+            <button id="dash-export-csv" class="dash-action" type="button" data-i18n-attr="aria-label:dash.exportCsv" aria-label="Exporter en CSV">
                 <span aria-hidden="true">⤓</span><span>CSV</span>
             </button>
-            <button id="dash-export-json" class="dash-action" type="button" aria-label="Exporter en JSON">
+            <button id="dash-export-json" class="dash-action" type="button" data-i18n-attr="aria-label:dash.exportJson" aria-label="Exporter en JSON">
                 <span aria-hidden="true">⤓</span><span>JSON</span>
             </button>
-            <button id="dash-share" class="dash-action" type="button" aria-label="Partager">
+            <button id="dash-share" class="dash-action" type="button" data-i18n-attr="aria-label:share.title" aria-label="Partager">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
-                <span>Partager</span>
+                <span data-i18n="share.title">Partager</span>
             </button>
         </div>
     </header>
 
     <main id="dash-content" class="dash-content" aria-live="polite">
         <div class="dash-empty">
-            <p>Aucune donnée à afficher.</p>
-            <a href="index.html" class="file-btn">Analyser une conversation</a>
+            <p data-i18n="dash.empty">Aucune donnée à afficher.</p>
+            <a href="index.html" class="file-btn" data-i18n="dash.emptyCta">Analyser une conversation</a>
         </div>
     </main>
 

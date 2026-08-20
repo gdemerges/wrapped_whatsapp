@@ -15,10 +15,10 @@
  *   ←  { kind: 'error', message, diagnostics? }
  */
 
-import { parse, diagnose } from './parser.js';
+import { createStreamParser } from './parser.js';
 import { compute, compareYears } from './stats.js';
 import { computeSentimentML } from './worker/sentiment-ml.js';
-import { hashText, getCached, setCached } from './cache.js';
+import { createHasher, getCached, setCached } from './cache.js';
 
 /** @type {import('./types.d.ts').Message[] | null} */
 let messages = null;
@@ -26,6 +26,9 @@ let messages = null;
 let fileHash = null;
 
 const post = (msg) => self.postMessage(msg);
+
+/** Tag an error with a stable code the UI can translate. @see js/parser.js */
+const coded = (err, code) => Object.assign(err, { code });
 const progress = (text) => post({ kind: 'progress', text });
 
 self.onmessage = async (e) => {
@@ -38,28 +41,47 @@ self.onmessage = async (e) => {
             default: throw new Error(`Message worker inconnu: ${msg.kind}`);
         }
     } catch (err) {
-        post({ kind: 'error', message: err.message, diagnostics: err.diagnostics || null });
+        post({
+            kind: 'error',
+            message: err.message,
+            code: err.code || null,
+            diagnostics: err.diagnostics || null,
+        });
     }
 };
 
+/**
+ * Read, fingerprint and parse the export in one pass over the byte stream.
+ *
+ * Reading the file with `blob.text()` first put a full copy of a 50 MB export
+ * in memory, then hashed a copy of it, then handed it to a parser that split
+ * it into a second full copy as an array of lines — three live copies at the
+ * peak, which is what got the tab killed on a phone. Nothing here ever holds
+ * more than one chunk plus the parser's own buffers, and the progress line can
+ * finally report a real percentage instead of "Lecture du fichier...".
+ */
 async function handleLoad({ blob }) {
-    progress('Lecture du fichier...');
-    const text = await blob.text();
+    progress('Lecture du fichier... 0%');
+
+    const parser = createStreamParser();
+    const hasher = createHasher();
+
+    for await (const { chunk, done } of readChunks(blob)) {
+        hasher.push(chunk);
+        parser.push(chunk);
+        progress(`Lecture du fichier... ${done}%`);
+    }
 
     progress('Analyse des messages...');
-    fileHash = await hashText(text);
-    try {
-        messages = parse(text);
-    } catch (err) {
-        // Attach a diagnostic snapshot so the UI can tell the user *why* the
-        // file was rejected instead of just flashing "format non reconnu".
-        err.diagnostics = diagnose(text);
-        throw err;
-    }
+    fileHash = await hasher.digest();
+    // A parse failure already carries a diagnostic snapshot, so the UI can say
+    // *why* the file was rejected instead of just flashing "format non reconnu".
+    messages = parser.end();
 
     if (messages.length === 0) {
         const err = new Error('Aucun message exploitable dans ce fichier.');
-        err.diagnostics = diagnose(text);
+        err.code = 'noMessages';
+        err.diagnostics = parser.diagnostics();
         throw err;
     }
 
@@ -82,10 +104,10 @@ async function handleLoad({ blob }) {
 }
 
 async function handleStats({ year = null, range = null, ai = false }) {
-    if (!messages) throw new Error('Aucun fichier chargé.');
+    if (!messages) throw coded(new Error('Aucun fichier chargé.'), 'noFile');
 
     const selection = selectMessages(messages, year, range);
-    if (selection.length < 5) throw new Error('Trop peu de messages sur cette période.');
+    if (selection.length < 5) throw coded(new Error('Trop peu de messages sur cette période.'), 'tooFewMessages');
 
     const cacheKey = `${fileHash}|y=${year}|r=${range ? range.from + '_' + range.to : ''}|ai=${ai ? 1 : 0}`;
     const cached = await getCached(cacheKey);
@@ -103,6 +125,39 @@ async function handleStats({ year = null, range = null, ai = false }) {
 
     setCached(cacheKey, { stats, comparison });
     post({ kind: 'stats', stats, comparison, cached: false });
+}
+
+/**
+ * Yield decoded chunks of a blob along with progress, falling back to a single
+ * chunk where streams are unavailable (older Safari).
+ *
+ * @param {Blob} blob
+ */
+async function* readChunks(blob) {
+    if (typeof blob.stream !== 'function') {
+        yield { chunk: await blob.text(), done: 100 };
+        return;
+    }
+    // Decoding is driven by hand rather than through TextDecoderStream so the
+    // *byte* count stays available — the only figure that maps to the file
+    // size the user sees.
+    const reader = blob.stream().getReader();
+    const decoder = new TextDecoder('utf-8');
+    const total = blob.size || 1;
+    let read = 0;
+    try {
+        for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            read += value.byteLength;
+            const chunk = decoder.decode(value, { stream: true });
+            if (chunk) yield { chunk, done: Math.min(99, Math.round((read / total) * 100)) };
+        }
+    } finally {
+        reader.releaseLock();
+    }
+    const rest = decoder.decode();
+    if (rest) yield { chunk: rest, done: 100 };
 }
 
 /** Filter by explicit date range if given, else by year, else everything. */

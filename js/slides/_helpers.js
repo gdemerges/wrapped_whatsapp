@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils.js';
+import { monthShort } from '../format.js';
 import { CHART_COLORS } from './_constants.js';
 
 export function rankingBars(items, valueFn, labelFn, max) {
@@ -18,8 +19,5 @@ export function rankingBars(items, valueFn, labelFn, max) {
 }
 
 export function monthLabels(monthKeys) {
-    return monthKeys.map(m => {
-        const [y, mo] = m.split('-');
-        return new Date(y, parseInt(mo) - 1).toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
-    });
+    return monthKeys.map(monthShort);
 }

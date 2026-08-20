@@ -1,11 +1,13 @@
-import { escapeHtml, fmt, fmtTime } from '../utils.js';
+import { escapeHtml } from '../utils.js';
+import { fmt, fmtTime, fmtHour } from '../format.js';
+import { t } from '../i18n.js';
 import { CHART_COLORS } from './_constants.js';
 
 const MAX_PROFILES = 8;
 
 /** "13h" — the hour a person is most likely to be typing. */
 function hourLabel(h) {
-    return typeof h === 'number' && h >= 0 ? `${h}h` : '—';
+    return typeof h === 'number' && h >= 0 ? fmtHour(h) : t('common.none');
 }
 
 /**
@@ -19,12 +21,12 @@ export function profilesSlide(stats, gradient) {
     const cards = profiles.map((p, i) => {
         const color = CHART_COLORS[i % CHART_COLORS.length];
         const traits = [
-            ['messages', fmt(p.count)],
-            ['du total', `${p.percent}%`],
-            ['car. / msg', fmt(p.avgLen)],
-            ['heure fétiche', hourLabel(p.peakHour)],
-            ['réponse', p.avgResponseMin != null ? fmtTime(p.avgResponseMin) : '—'],
-            ['jours lancés', fmt(p.initiations)],
+            [t('units.messages'), fmt(p.count)],
+            [t('units.share'), `${p.percent}%`],
+            [t('units.charsPerMsg'), fmt(p.avgLen)],
+            [t('slide.profiles.peakHour'), hourLabel(p.peakHour)],
+            [t('slide.profiles.response'), p.avgResponseMin != null ? fmtTime(p.avgResponseMin) : t('common.none')],
+            [t('slide.profiles.initiations'), fmt(p.initiations)],
         ].map(([label, value]) =>
             `<div class="profile-trait"><span class="profile-trait-value">${value}</span><span class="profile-trait-label">${label}</span></div>`
         ).join('');
@@ -50,8 +52,8 @@ export function profilesSlide(stats, gradient) {
         gradient,
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Profils</span>
-                <h2 class="slide-title">Carte d'identité de chacun</h2>
+                <span class="slide-tag">${t('slide.profiles.tag')}</span>
+                <h2 class="slide-title">${t('slide.profiles.title')}</h2>
                 <div class="profile-grid">${cards}</div>
             </div>
         `,

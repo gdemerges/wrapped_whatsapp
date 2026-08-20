@@ -1,4 +1,6 @@
 import { escapeHtml } from '../utils.js';
+import { fmtDayMonth, fmtHour } from '../format.js';
+import { t } from '../i18n.js';
 import { CHART_COLORS } from './_constants.js';
 import { monthLabels } from './_helpers.js';
 import { makeChart } from './_charts.js';
@@ -7,27 +9,30 @@ export function ambianceSlide(stats, gradient) {
     const st = stats.sentiment;
     if (!st || st.perPerson.length === 0) return null;
     const items = [];
+    const fact = (icon, text) =>
+        items.push(`<div class="fun-fact"><div class="fun-fact-icon">${icon}</div><div class="fun-fact-text">${text}</div></div>`);
+
     if (st.sweetest?.compliment > 0)
-        items.push(`<div class="fun-fact"><div class="fun-fact-icon">🌸</div><div class="fun-fact-text">Le plus gentil : <strong>${escapeHtml(st.sweetest.author)}</strong> (${st.sweetest.compliment} compliments)</div></div>`);
+        fact('🌸', t('slide.mood.sweetest', { name: escapeHtml(st.sweetest.author), n: st.sweetest.compliment }));
     if (st.sharpest?.insult > 0)
-        items.push(`<div class="fun-fact"><div class="fun-fact-icon">🌶️</div><div class="fun-fact-text">Le plus piquant : <strong>${escapeHtml(st.sharpest.author)}</strong> (${st.sharpest.insult} piques)</div></div>`);
+        fact('🌶️', t('slide.mood.sharpest', { name: escapeHtml(st.sharpest.author), n: st.sharpest.insult }));
     if (st.mostPositive)
-        items.push(`<div class="fun-fact"><div class="fun-fact-icon">☀️</div><div class="fun-fact-text">Ton le plus positif : <strong>${escapeHtml(st.mostPositive.author)}</strong></div></div>`);
+        fact('☀️', t('slide.mood.mostPositive', { name: escapeHtml(st.mostPositive.author) }));
     if (st.mostNegative && st.mostNegative !== st.mostPositive)
-        items.push(`<div class="fun-fact"><div class="fun-fact-icon">🌧️</div><div class="fun-fact-text">Ton le plus negatif : <strong>${escapeHtml(st.mostNegative.author)}</strong></div></div>`);
+        fact('🌧️', t('slide.mood.mostNegative', { name: escapeHtml(st.mostNegative.author) }));
     if (st.mostVolatile && st.mostVolatile !== st.mostStable)
-        items.push(`<div class="fun-fact"><div class="fun-fact-icon">🎢</div><div class="fun-fact-text">Le plus en montagnes russes : <strong>${escapeHtml(st.mostVolatile.author)}</strong></div></div>`);
+        fact('🎢', t('slide.mood.mostVolatile', { name: escapeHtml(st.mostVolatile.author) }));
     if (st.mostStable && st.perPerson.length > 1)
-        items.push(`<div class="fun-fact"><div class="fun-fact-icon">🧘</div><div class="fun-fact-text">Le plus constant : <strong>${escapeHtml(st.mostStable.author)}</strong></div></div>`);
+        fact('🧘', t('slide.mood.mostStable', { name: escapeHtml(st.mostStable.author) }));
     if (!st.mlEnabled)
-        items.push(`<div class="fun-fact"><div class="fun-fact-icon">ℹ️</div><div class="fun-fact-text">Analyse ML indisponible — données basées sur le lexique</div></div>`);
+        fact('ℹ️', t('slide.mood.noML'));
     if (items.length === 0) return null;
     return {
         gradient,
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Ton</span>
-                <h2 class="slide-title">L'ambiance du chat</h2>
+                <span class="slide-tag">${t('slide.mood.tag')}</span>
+                <h2 class="slide-title">${t('slide.mood.title')}</h2>
                 <div class="fun-facts">${items.join('')}</div>
             </div>
         `,
@@ -44,8 +49,8 @@ export function sentimentTimelineSlide(stats, gradient) {
         gradient,
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Atmosphere</span>
-                <h2 class="slide-title">L'ambiance dans le temps</h2>
+                <span class="slide-tag">${t('slide.timeline.tag')}</span>
+                <h2 class="slide-title">${t('slide.timeline.title')}</h2>
                 <div class="chart-wrapper"><canvas id="chart-sent-timeline" height="280"></canvas></div>
             </div>
         `,
@@ -54,7 +59,7 @@ export function sentimentTimelineSlide(stats, gradient) {
             const labels = monthLabels(months);
             const datasets = [];
             datasets.push({
-                label: 'Moyenne',
+                label: t('slide.timeline.average'),
                 data: months.map(m => {
                     const v = st.monthly[m];
                     return v != null ? Math.round(v * 100) : null;
@@ -122,18 +127,18 @@ export function moodHourlySlide(stats, gradient) {
         gradient,
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Humeur</span>
-                <h2 class="slide-title">L'horloge des humeurs</h2>
+                <span class="slide-tag">${t('slide.moodClock.tag')}</span>
+                <h2 class="slide-title">${t('slide.moodClock.title')}</h2>
                 <div class="chart-wrapper"><canvas id="chart-sent-hourly" height="200"></canvas></div>
                 <div class="fun-facts" style="margin-top:0.75rem;">
-                    ${bestHour  ? `<div class="fun-fact"><div class="fun-fact-icon">🌞</div><div class="fun-fact-text">Heure la plus positive : <strong>${bestHour.h}h</strong></div></div>` : ''}
-                    ${worstHour ? `<div class="fun-fact"><div class="fun-fact-icon">😴</div><div class="fun-fact-text">Heure la plus negative : <strong>${worstHour.h}h</strong></div></div>` : ''}
+                    ${bestHour  ? `<div class="fun-fact"><div class="fun-fact-icon">🌞</div><div class="fun-fact-text">${t('slide.moodClock.best', { hour: fmtHour(bestHour.h) })}</div></div>` : ''}
+                    ${worstHour ? `<div class="fun-fact"><div class="fun-fact-icon">😴</div><div class="fun-fact-text">${t('slide.moodClock.worst', { hour: fmtHour(worstHour.h) })}</div></div>` : ''}
                 </div>
             </div>
         `,
         chart: (_, slide) => {
             const canvas = slide.querySelector('#chart-sent-hourly');
-            const labels = Array.from({ length: 24 }, (_, h) => `${h}h`);
+            const labels = Array.from({ length: 24 }, (_, h) => fmtHour(h));
             const data   = sentHourly.map(v => v != null ? Math.round(v * 100) : null);
             const bgColors = data.map(v => {
                 if (v == null) return 'transparent';
@@ -162,9 +167,12 @@ export function momentsSlide(stats, gradient) {
     const hasBest  = st.bestDays?.length > 0;
     const hasWorst = st.worstDays?.length > 0;
     if (!hasBest && !hasWorst) return null;
-    const fmtDay = d => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+    const fmtDay = d => fmtDayMonth(d);
     const moodIcon  = v => v > 0.5 ? '🌟' : v > 0.15 ? '☀️' : v < -0.5 ? '⛈️' : '🌧️';
-    const moodLabel = v => v > 0.5 ? 'super positif' : v > 0.15 ? 'bonne ambiance' : v < -0.5 ? 'vraiment difficile' : 'ambiance tendue';
+    const moodLabel = v => t(v > 0.5 ? 'slide.moments.great'
+        : v > 0.15 ? 'slide.moments.good'
+        : v < -0.5 ? 'slide.moments.hard'
+        : 'slide.moments.tense');
     const bestItems = (st.bestDays || []).slice(0, 3).map(d =>
         `<div class="fun-fact"><div class="fun-fact-icon">${moodIcon(d.mean)}</div><div class="fun-fact-text"><strong>${fmtDay(d.date)}</strong> — ${moodLabel(d.mean)}</div></div>`
     ).join('');
@@ -178,10 +186,10 @@ export function momentsSlide(stats, gradient) {
         gradient,
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Moments</span>
-                <h2 class="slide-title">Vos journees marquantes</h2>
-                ${bestItems  ? `<p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:0.4rem;">Meilleures journees ✨</p>${bestItems}` : ''}
-                ${worstItems ? `<p style="color:var(--text-muted);font-size:0.8rem;margin:0.75rem 0 0.4rem;">Journees plus difficiles</p>${worstItems}` : ''}
+                <span class="slide-tag">${t('slide.moments.tag')}</span>
+                <h2 class="slide-title">${t('slide.moments.title')}</h2>
+                ${bestItems  ? `<p style="color:var(--text-muted);font-size:0.8rem;margin-bottom:0.4rem;">${t('slide.moments.bestTitle')}</p>${bestItems}` : ''}
+                ${worstItems ? `<p style="color:var(--text-muted);font-size:0.8rem;margin:0.75rem 0 0.4rem;">${t('slide.moments.worstTitle')}</p>${worstItems}` : ''}
             </div>
         `,
     };
@@ -198,16 +206,16 @@ export function influenceSlide(stats, gradient) {
         const pct  = Math.round(mean * 100);
         const icon = pct > 10 ? '🌟' : pct > 0 ? '☀️' : pct < -10 ? '⛈️' : '🌧️';
         const desc = pct >= 0
-            ? `+${pct}% de positivite apres ses messages`
-            : `${pct}% d'ambiance apres ses messages`;
+            ? t('slide.influence.positive', { pct })
+            : t('slide.influence.negative', { pct });
         return `<div class="fun-fact"><div class="fun-fact-icon">${icon}</div><div class="fun-fact-text"><strong>${escapeHtml(author)}</strong> : ${desc}</div></div>`;
     }).join('');
     return {
         gradient,
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Influence</span>
-                <h2 class="slide-title">Qui met de bonne humeur ?</h2>
+                <span class="slide-tag">${t('slide.influence.tag')}</span>
+                <h2 class="slide-title">${t('slide.influence.title')}</h2>
                 <div class="fun-facts">${items}</div>
             </div>
         `,

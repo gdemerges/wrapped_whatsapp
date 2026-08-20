@@ -1,4 +1,6 @@
-import { escapeHtml, fmt } from '../utils.js';
+import { escapeHtml } from '../utils.js';
+import { fmt } from '../format.js';
+import { t } from '../i18n.js';
 import { CHART_COLORS } from './_constants.js';
 
 const SIZE = 420;
@@ -61,19 +63,19 @@ export function interactionsSlide(stats, gradient) {
     }).join('');
 
     const top = visible.slice(0, 3).map(p =>
-        `<li><strong>${escapeHtml(p.a)}</strong> ↔ <strong>${escapeHtml(p.b)}</strong> — ${fmt(p.count)} échanges</li>`
+        `<li>${t('slide.network.pair', { a: escapeHtml(p.a), b: escapeHtml(p.b), n: fmt(p.count) })}</li>`
     ).join('');
 
     return {
         gradient,
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Réseau</span>
-                <h2 class="slide-title">Qui parle à qui ?</h2>
-                <p class="slide-subtitle">Épaisseur du trait = nombre de réponses échangées</p>
+                <span class="slide-tag">${t('slide.network.tag')}</span>
+                <h2 class="slide-title">${t('slide.network.title')}</h2>
+                <p class="slide-subtitle">${t('slide.network.subtitle')}</p>
                 <div class="network-wrap">
                     <svg viewBox="0 0 ${SIZE} ${SIZE}" class="network-svg" role="img"
-                         aria-label="Graphe des échanges entre participants">
+                         aria-label="${t('slide.network.svgLabel')}">
                         <g class="network-chords">${chords}</g>
                         <g class="network-nodes">${nodes}</g>
                     </svg>

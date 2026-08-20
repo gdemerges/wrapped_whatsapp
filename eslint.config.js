@@ -28,6 +28,7 @@ export default [
                 indexedDB: 'readonly',
                 crypto: 'readonly',
                 TextEncoder: 'readonly',
+                TextDecoder: 'readonly',
                 File: 'readonly',
                 Blob: 'readonly',
                 FileReader: 'readonly',

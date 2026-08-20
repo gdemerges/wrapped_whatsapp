@@ -10,77 +10,62 @@
  * with a permissive <date>/<time> and the day/month order *inferred from the
  * file* instead of guessed from the separator — that guess used to mangle
  * European exports with a two-digit year (12/03/24 read as December 3rd).
+ *
+ * Everything WhatsApp writes in the user's language (media placeholders,
+ * system notices, deletion tombstones, poll headers) lives in
+ * `js/lang/chat-locales.js`.
+ *
+ * The parser is a **stream**: `createStreamParser()` takes the file in chunks
+ * and never holds the whole text. `parse(text)` is the same machine fed in one
+ * go, kept for tests and for anything that already has a string.
  */
+
+import {
+    SYSTEM_AUTHORS, SYSTEM_KEYWORDS, MEDIA_PATTERNS, EDITED_PATTERNS,
+    DELETED_PATTERNS, POLL_PREFIXES, REACTION_RE,
+} from './lang/chat-locales.js';
 
 const DATE = String.raw`\d{1,4}[/.\-]\d{1,2}[/.\-]\d{2,4}`;
 // Optional seconds; AM/PM optionally dotted and preceded by a regular or
 // narrow no-break space (iOS uses U+202F in recent versions).
-const TIME = String.raw`\d{1,2}[:.]\d{2}(?::\d{2})?(?:[\s  ]*[APap]\.?[Mm]\.?)?`;
+const TIME = String.raw`\d{1,2}[:.]\d{2}(?::\d{2})?(?:[\s  ]*[APap]\.?[Mm]\.?)?`;
+// WhatsApp's own separator is a hyphen, but exports that have been through a
+// text editor or a mail client come back with an en or em dash.
+const DASH = String.raw`[-–—]`;
 
 const PATTERNS = [
     // iOS: [12/03/2024, 14:30:00] Alice: hello   (comma optional)
-    new RegExp(String.raw`^\[(${DATE}),?[\s  ]+(${TIME})\]\s*([^:]+):\s(.+)$`),
-    // Android: 12/03/2024, 14:30 - Alice: hello  (comma optional, en dash tolerated)
-    new RegExp(String.raw`^(${DATE}),?[\s  ]+(${TIME})\s*[-–]\s*([^:]+):\s(.+)$`),
+    new RegExp(String.raw`^\[(${DATE}),?[\s  ]+(${TIME})\]\s*([^:]+):\s(.+)$`),
+    // Android: 12/03/2024, 14:30 - Alice: hello  (comma optional, dashes tolerated)
+    new RegExp(String.raw`^(${DATE}),?[\s  ]+(${TIME})\s*${DASH}\s*([^:]+):\s(.+)$`),
 ];
 
 /** A line that starts a message but has no author (system notice). */
 const SYSTEM_LINE_PATTERNS = [
-    new RegExp(String.raw`^\[(${DATE}),?[\s  ]+(${TIME})\]\s*(.+)$`),
-    new RegExp(String.raw`^(${DATE}),?[\s  ]+(${TIME})\s*[-–]\s*(.+)$`),
+    new RegExp(String.raw`^\[(${DATE}),?[\s  ]+(${TIME})\]\s*(.+)$`),
+    new RegExp(String.raw`^(${DATE}),?[\s  ]+(${TIME})\s*${DASH}\s*(.+)$`),
 ];
 
-const SYSTEM_AUTHORS = ['Meta AI', 'WhatsApp'];
+/**
+ * Bidirectional and zero-width controls WhatsApp sprinkles through the file.
+ *
+ * U+200D (ZWJ) and U+FE0F are deliberately absent: they are what holds a
+ * multi-codepoint emoji together, and stripping them would shatter 👩‍👩‍👧 into
+ * three separate people.
+ */
+const INVISIBLE_RE = /[​‎‏؜‪-‮⁦-⁩﻿]/g;
 
-const SYSTEM_KEYWORDS = [
-    // FR
-    'a créé le groupe', 'vous a ajouté', 'a ajouté', "a changé l'icône",
-    'Les messages et les appels', 'a quitté', 'a été retiré', 'est passé',
-    'a modifié le sujet', 'a rejoint en utilisant', 'Le code de sécurité',
-    'a changé le sujet', 'a remplacé le nom du groupe',
-    'Seuls les messages partagés avec @Meta AI', "Les messages sont générés par l'IA",
-    // EN
-    'Messages to this chat', 'messages and calls are end-to-end',
-    'created group', 'created this group', 'added you', 'changed the subject',
-    'changed this group', 'left', 'removed', 'joined using',
-    'security code changed', 'changed their phone number',
-    // ES
-    'Los mensajes y las llamadas', 'creó el grupo', 'añadió a', 'salió',
-    'cambió el asunto', 'se unió usando', 'El código de seguridad',
-    // DE
-    'Nachrichten und Anrufe', 'hat die Gruppe erstellt', 'hat dich hinzugefügt',
-    'hat hinzugefügt', 'hat die Gruppe verlassen', 'Sicherheitsnummer',
-];
-
-const MEDIA_PATTERNS = [
-    // FR
-    'image absente', 'GIF retiré', 'sticker omis', 'vidéo absente',
-    'audio omis', 'document omis', '<Médias omis>',
-    // EN
-    'Media omitted', 'image omitted', 'video omitted', 'audio omitted',
-    'document omitted', 'sticker omitted', 'GIF omitted', 'Contact card omitted',
-    // ES
-    'imagen omitida', 'video omitido', 'audio omitido', 'sticker omitido',
-    'documento omitido', 'GIF omitido', 'Multimedia omitido',
-    // DE
-    'Bild weggelassen', 'Video weggelassen', 'Audio weggelassen',
-    'Dokument weggelassen', 'Sticker weggelassen', 'GIF weggelassen',
-];
-
-const EDITED_PATTERNS = [
-    '<Ce message a été modifié>', '<This message was edited>',
-    '<Se editó este mensaje>', '<Diese Nachricht wurde bearbeitet>',
-];
-
-const REACTION_RE =
-    /^(?:a réagi|reacted|a aimé|liked|reaccionó|hat reagiert)\s+((?:\p{Extended_Pictographic}️?(?:‍\p{Extended_Pictographic}️?)*)+)/u;
+/** Lines buffered before the format is decided. */
+const DETECT_WINDOW = 200;
+/** Date/time tokens sampled before settling the day/month order. */
+const ORDER_SAMPLE = 2000;
 
 /**
  * Detect which regex pattern matches this file.
- * Requires ≥3 matches in the first 200 lines to avoid false positives.
+ * Requires ≥3 matches in the sample to avoid false positives.
  */
 export function detectPattern(lines) {
-    const sampleSize = Math.min(200, lines.length);
+    const sampleSize = Math.min(DETECT_WINDOW, lines.length);
     const threshold = Math.max(1, Math.min(3, Math.floor(sampleSize / 3)));
     let best = null;
     let bestScore = 0;
@@ -154,7 +139,7 @@ export function parseDate(dateStr, timeStr, order = 'dmy') {
 
 /** "2:30 PM" / "14.30" / "14:30:05" → { h, m, s } */
 function normalizeTime(timeStr) {
-    const t = String(timeStr).replace(/[  ]/g, ' ').trim();
+    const t = String(timeStr).replace(/[  ]/g, ' ').trim();
     const ampm = t.match(/([APap])\.?[Mm]\.?\s*$/);
     const clock = t.replace(/[APap]\.?[Mm]\.?\s*$/, '').trim().split(/[:.]/);
     if (clock.length < 2) return null;
@@ -178,26 +163,17 @@ export function cleanLine(line) {
                .replace(/\r$/, '');
 }
 
-function isSystemText(text) {
-    return SYSTEM_KEYWORDS.some(k => text.includes(k));
+/** Drop bidi/zero-width noise from anywhere in a string, emoji glue excepted. */
+export function stripInvisible(str) {
+    return str.replace(INVISIBLE_RE, '');
 }
 
-/**
- * Inspect a file that failed to parse, so the UI can explain *why*.
- * The returned sample lines are truncated and stripped of anything after the
- * first colon — enough to recognise a format, not enough to leak a message.
- * @returns {{ totalLines: number, matched: number, detected: boolean, samples: string[] }}
- */
-export function diagnose(text) {
-    const lines = text.split('\n').map(cleanLine).filter(l => l.trim() !== '');
-    const pattern = detectPattern(lines);
-    let matched = 0;
-    const samples = [];
-    for (const line of lines.slice(0, 200)) {
-        if (pattern && pattern.test(line)) { matched++; continue; }
-        if (samples.length < 3) samples.push(redact(line));
-    }
-    return { totalLines: lines.length, matched, detected: !!pattern, samples };
+function matchesAny(haystackLower, needles) {
+    return needles.some(n => haystackLower.includes(n));
+}
+
+function isSystemText(text) {
+    return matchesAny(text.toLowerCase(), SYSTEM_KEYWORDS);
 }
 
 /** Keep the date/time scaffolding, drop the human content. */
@@ -207,95 +183,225 @@ function redact(line) {
 }
 
 /**
- * Parse chat text into structured messages.
- * @param {string} text
- * @param {{ year?: number }} [options]
- * @returns {import('./types.d.ts').Message[]}
+ * Incremental parser.
+ *
+ * Feed it the file in whatever chunks arrive; it buffers only a partial line
+ * and the first `DETECT_WINDOW` lines (needed to decide the format). The full
+ * text is never held, which is what keeps a 50 MB export from peaking at three
+ * copies of itself — the string, the array of lines, and the records.
+ *
+ * Diagnostics are accumulated as the file goes past, so a rejected file can be
+ * explained without a second pass over it.
+ *
+ * @returns {{
+ *   push: (chunk: string) => void,
+ *   end: (options?: { year?: number }) => import('./types.d.ts').Message[],
+ *   diagnostics: () => import('./types.d.ts').ParseDiagnostics,
+ * }}
  */
-export function parse(text, options = {}) {
-    const lines = text.split('\n').map(cleanLine);
-    const pattern = detectPattern(lines);
+export function createStreamParser() {
+    /** @type {RegExp | null} */
+    let pattern = null;
+    /** @type {RegExp | null} */
+    let systemPattern = null;
+    let detected = false;
 
-    if (!pattern) {
-        throw new Error("Format de fichier non reconnu. Assurez-vous d'exporter la conversation depuis WhatsApp.");
-    }
-
-    // First pass: collect date/time tokens to settle the day/month order once
-    // for the whole file, rather than per line.
-    const dateSamples = [];
-    const timeSamples = [];
-    for (const line of lines) {
-        const m = line.match(pattern);
-        if (!m) continue;
-        dateSamples.push(m[1]);
-        timeSamples.push(m[2]);
-        if (dateSamples.length >= 2000) break;
-    }
-    const order = inferDateOrder(dateSamples, timeSamples);
-
-    const systemPattern = SYSTEM_LINE_PATTERNS[PATTERNS.indexOf(pattern)];
+    let tail = '';                  // partial line across chunk boundaries
+    /** @type {string[]} */
+    const head = [];                // lines held back until the format is known
 
     /** @type {any[]} */
     const records = [];
     /** @type {any} */
     let current = null;
 
-    for (const line of lines) {
-        const m = line.match(pattern);
+    const dateSamples = [];
+    const timeSamples = [];
+
+    // Diagnostics, gathered on the fly.
+    let totalLines = 0;
+    let matched = 0;
+    let inspected = 0;
+    const samples = [];
+
+    function decide() {
+        pattern = detectPattern(head);
+        systemPattern = pattern ? SYSTEM_LINE_PATTERNS[PATTERNS.indexOf(pattern)] : null;
+        detected = true;
+        for (const line of head) consume(line);
+        head.length = 0;
+    }
+
+    // Blank lines are structural, not content: counting them would inflate
+    // "lines read" and fill the sample list with empty strings.
+    function note(line, isMatch) {
+        if (line.trim() === '') return;
+        totalLines++;
+        if (inspected >= DETECT_WINDOW) return;
+        inspected++;
+        if (isMatch) matched++;
+        else if (samples.length < 3) samples.push(redact(line));
+    }
+
+    function consume(line) {
+        const m = pattern && line.match(pattern);
+        note(line, Boolean(m));
         if (m) {
             if (current) records.push(current);
             const [, dateStr, timeStr, author, body] = m;
+            if (dateSamples.length < ORDER_SAMPLE) {
+                dateSamples.push(dateStr);
+                timeSamples.push(timeStr);
+            }
             current = {
-                datetime: parseDate(dateStr, timeStr, order),
+                dateStr,
+                timeStr,
                 author: normalizeAuthor(author),
-                message: body.replace(/[‎‏]/g, ''),
+                message: stripInvisible(body),
             };
-            continue;
+            return;
         }
         // An author-less dated line is a system notice — it must break the
         // current message rather than be appended to it as a continuation.
         const sys = systemPattern && line.match(systemPattern);
         if (sys && isSystemText(sys[3])) {
             if (current) { records.push(current); current = null; }
-            continue;
+            return;
         }
-        if (current) current.message += '\n' + cleanLine(line);
-    }
-    if (current) records.push(current);
-
-    let validRecords = records.filter(r => !isNaN(r.datetime.getTime()));
-
-    // Guard against a locale/format mismatch: if lines matched the layout but
-    // none yielded a valid date, fail loudly instead of returning nothing.
-    if (records.length > 0 && validRecords.length === 0) {
-        throw new Error("Les dates du fichier n'ont pas pu être interprétées (format de date non reconnu).");
+        if (current) current.message += '\n' + stripInvisible(cleanLine(line));
     }
 
-    if (options.year) {
-        validRecords = validRecords.filter(r => r.datetime.getFullYear() === options.year);
-    }
-
-    for (const r of validRecords) {
-        r.isSystem = isSystemText(r.message) || SYSTEM_AUTHORS.some(a => r.author === a);
-        r.isMedia = MEDIA_PATTERNS.some(k => r.message.includes(k));
-        r.isEdited = EDITED_PATTERNS.some(k => r.message.includes(k));
-        r.msgLen = r.message.length;
-
-        const rx = r.message.match(REACTION_RE);
-        if (rx) {
-            r.isReaction = true;
-            r.reactionEmoji = rx[1];
-        } else {
-            r.isReaction = false;
+    function feed(raw) {
+        const line = cleanLine(raw);
+        if (!detected) {
+            head.push(line);
+            if (head.length >= DETECT_WINDOW) decide();
+            return;
         }
+        consume(line);
     }
 
-    return validRecords.filter(r => !r.isSystem);
+    function diagnostics() {
+        return { totalLines, matched, detected: Boolean(pattern), samples: [...samples] };
+    }
+
+    return {
+        push(chunk) {
+            const text = tail + chunk;
+            const lines = text.split('\n');
+            tail = lines.pop() ?? '';
+            for (const line of lines) feed(line);
+        },
+
+        end(options = {}) {
+            if (tail !== '') { feed(tail); tail = ''; }
+            if (!detected) decide();
+            if (current) { records.push(current); current = null; }
+
+            if (!pattern) {
+                throw withDiagnostics(
+                    new Error("Format de fichier non reconnu."),
+                    'unknownFormat',
+                    diagnostics(),
+                );
+            }
+
+            const order = inferDateOrder(dateSamples, timeSamples);
+            /** @type {any[]} */
+            const out = [];
+            let valid = 0;
+            for (const r of records) {
+                const datetime = parseDate(r.dateStr, r.timeStr, order);
+                if (isNaN(datetime.getTime())) continue;
+                valid++;
+                if (options.year && datetime.getFullYear() !== options.year) continue;
+                out.push(annotate(r, datetime));
+            }
+
+            // Guard against a locale/format mismatch: if lines matched the
+            // layout but none yielded a valid date, fail loudly rather than
+            // returning nothing.
+            if (records.length > 0 && valid === 0) {
+                throw withDiagnostics(
+                    new Error("Les dates du fichier n'ont pas pu être interprétées."),
+                    'unreadableDates',
+                    diagnostics(),
+                );
+            }
+
+            records.length = 0;
+            return out.filter(r => !r.isSystem);
+        },
+
+        diagnostics,
+    };
+}
+
+/**
+ * Errors cross a worker boundary, and the worker has no business knowing which
+ * language the page is in. Each one carries a stable `code` the UI translates;
+ * the message itself stays readable for anything that logs it raw.
+ */
+function withDiagnostics(err, code, diagnostics) {
+    /** @type {any} */ (err).code = code;
+    /** @type {any} */ (err).diagnostics = diagnostics;
+    return err;
+}
+
+/** Turn a raw record into a fully classified message. */
+function annotate(r, datetime) {
+    const message = r.message;
+    const lower = message.toLowerCase();
+    const trimmed = lower.trimStart();
+
+    const isDeleted = matchesAny(lower, DELETED_PATTERNS);
+    const rx = message.match(REACTION_RE);
+
+    return {
+        datetime,
+        author: r.author,
+        // A deleted message left a tombstone, not a sentence: keeping the
+        // placeholder text would put "this message was deleted" at the top of
+        // the word cloud and stretch the author's average message length.
+        message: isDeleted ? '' : message,
+        msgLen: isDeleted ? 0 : message.length,
+        isSystem: SYSTEM_AUTHORS.includes(r.author),
+        isMedia: !isDeleted && matchesAny(lower, MEDIA_PATTERNS),
+        isEdited: matchesAny(lower, EDITED_PATTERNS),
+        isDeleted,
+        isPoll: POLL_PREFIXES.some(p => trimmed.startsWith(p)),
+        isReaction: Boolean(rx),
+        ...(rx ? { reactionEmoji: rx[1] } : {}),
+    };
+}
+
+/**
+ * Parse chat text into structured messages.
+ * @param {string} text
+ * @param {{ year?: number }} [options]
+ * @returns {import('./types.d.ts').Message[]}
+ */
+export function parse(text, options = {}) {
+    const stream = createStreamParser();
+    stream.push(text);
+    return stream.end(options);
+}
+
+/**
+ * Inspect a file that failed to parse, so the UI can explain *why*.
+ * The returned sample lines are truncated and stripped of anything after the
+ * first colon — enough to recognise a format, not enough to leak a message.
+ * @returns {import('./types.d.ts').ParseDiagnostics}
+ */
+export function diagnose(text) {
+    const stream = createStreamParser();
+    stream.push(text);
+    try { stream.end(); } catch { /* diagnosing a failure is the point */ }
+    return stream.diagnostics();
 }
 
 function normalizeAuthor(raw) {
-    return raw.trim()
-        .replace(/[‎‏]/g, '')
+    return stripInvisible(raw)
         .replace(/^~\s*/, '')   // group members show as "~Nickname"
         .replace(/\s+/g, ' ')
         .trim();

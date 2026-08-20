@@ -6,10 +6,15 @@
 export interface Message {
     datetime: Date;
     author: string;
+    /** Empty for a deleted message: the tombstone is not what anyone wrote. */
     message: string;
     msgLen: number;
+    /** WhatsApp's own messages (Meta AI, service notices). */
+    isSystem: boolean;
     isMedia: boolean;
     isEdited: boolean;
+    isDeleted: boolean;
+    isPoll: boolean;
     isReaction: boolean;
     reactionEmoji?: string;
 }
@@ -19,6 +24,7 @@ export interface PerPerson {
     percent: string;
     media: number;
     edited: number;
+    deleted: number;
     emojis: number;
     links: number;
     totalChars: number;
@@ -134,6 +140,7 @@ export interface Stats {
     totalChars: number;
     totalMedia: number;
     totalEdited: number;
+    totalDeleted: number;
     totalLinks: number;
     avgMsgLen: number;
     participants: number;
@@ -146,7 +153,8 @@ export interface Stats {
     monthly: Record<string, number>;
     monthlyPerPerson: Record<string, Record<string, number>>;
     peakHour: number;
-    peakDay: string;
+    /** Monday = 0 — the index into the localised day names, not a label. */
+    peakDayIndex: number;
     mostActiveDay: [string, number];
     topWords: Array<[string, number]>;
     topWordsPerPerson: Record<string, Array<[string, number]>>;

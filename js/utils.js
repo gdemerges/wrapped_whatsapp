@@ -1,5 +1,9 @@
 /**
- * Shared helpers: escaping, date keys, formatters.
+ * Shared helpers with no locale and no DOM: escaping and date keys.
+ *
+ * The formatters used to live here too, but `stats.js` imports this module and
+ * runs inside the worker — pulling the UI dictionaries in with it. Anything
+ * that reads the current language is in `js/format.js` instead.
  */
 
 export function escapeHtml(str) {
@@ -9,22 +13,6 @@ export function escapeHtml(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
-}
-
-export function fmt(n) {
-    return Number(n).toLocaleString('fr-FR');
-}
-
-export function fmtTime(minutes) {
-    if (minutes < 60) return `${Math.round(minutes)} min`;
-    const h = Math.floor(minutes / 60);
-    const m = Math.round(minutes % 60);
-    return m > 0 ? `${h}h ${m}min` : `${h}h`;
-}
-
-export function fmtDate(date) {
-    const d = date instanceof Date ? date : new Date(date);
-    return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 /**
@@ -41,5 +29,3 @@ export function localDayKey(date) {
 export function localMonthKey(date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
-
-export const DAYS_FR = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];

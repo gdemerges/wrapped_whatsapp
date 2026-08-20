@@ -19,6 +19,7 @@ Vitest pour les tests, ESLint pour le lint.
 - Tout le traitement reste côté client — aucun appel réseau avec des données utilisateur
 - Modules ES natifs : `import`/`export`, jamais `require`
 - Lancer les tests : `npm test` — les faire passer avant tout commit
+  (Vitest ; les tests d'interface tournent sous jsdom via `@vitest-environment jsdom`)
 - Lancer le lint : `npm run lint`, et les types : `npm run typecheck`
 - Serveur local : `python -m http.server 8000` (aucun outil de build)
 - `index.html#demo` charge une conversation fictive — pratique pour tester sans export réel
@@ -29,8 +30,10 @@ Vitest pour les tests, ESLint pour le lint.
 |---|---|
 | `js/app.js` | Orchestration : import de fichier, worker, écrans |
 | `js/deck.js` | Navigation entre slides, mode lecture automatique |
-| `js/worker.js` | Web Worker : lit le fichier, parse, calcule, met en cache |
-| `js/parser.js` | Parsing des exports WhatsApp (iOS / Android, FR / EN / ES / DE) |
+| `js/worker.js` | Web Worker : lit le fichier **en flux**, parse, calcule, met en cache |
+| `js/parser.js` | Parsing des exports WhatsApp (iOS / Android, 7 langues) |
+| `js/i18n.js` | Langue de l'interface : `t()`, `setLocale`, traduction du HTML statique |
+| `js/format.js` | Nombres, dates, heures, jours — tout ce qui dépend de la langue |
 | `js/stats.js` | Calcul de toutes les statistiques |
 | `js/slides/` | Une slide par fichier ; `index.js` compose le deck |
 | `js/export-image.js` | Rendu canvas des images partageables (story et poster) |
@@ -41,6 +44,8 @@ Vitest pour les tests, ESLint pour le lint.
 | `js/analytics.js` | Compteur d'usage anonyme, inerte tant que non configuré |
 | `js/ui/` | Dialogues, toasts, feuille de partage, gestion du hash |
 | `js/dashboard.js` | Vue tableau de bord |
+| `js/lang/ui/` | Dictionnaires d'interface — `fr.js` fait référence |
+| `js/lang/chat-locales.js` | Libellés que WhatsApp écrit dans le fichier (médias, notices…) |
 | `js/lang/` | Données de langue (stopwords, sentiment) |
 | `tests/` | Tests Vitest — voir les fixtures pour les formats de chat supportés |
 
@@ -64,6 +69,16 @@ Vitest pour les tests, ESLint pour le lint.
   Un nouvel événement se déclare dans `js/analytics.js` et se documente dans le README.
 - **Le partage par lien** doit rester anonymisable : toute nouvelle statistique portant un nom
   de personne doit survivre au parcours générique de `anonymize.js` (clé *ou* valeur).
+- **Aucun texte visible en dur.** Toute chaîne affichée passe par `t('clé')`, et la clé naît
+  dans `js/lang/ui/fr.js` avant d'être traduite. Le HTML statique s'annote `data-i18n`,
+  `data-i18n-html` (quand la phrase contient un `<strong>`) ou `data-i18n-attr`. Les tests
+  échouent sur une clé manquante, une clé en trop, ou un `{paramètre}` perdu en traduction.
+- **Rien de localisé ne descend dans le worker.** `stats.js` ne produit que des données —
+  `peakDayIndex`, pas « Mardi ». Une erreur qui doit être lue par un humain traverse la
+  frontière sous forme de `code` (`err.code = 'tooFewMessages'`), que la page traduit.
+- **Le parseur ne suppose jamais la langue** : les libellés WhatsApp se déclarent dans
+  `js/lang/chat-locales.js`, et `MEDIA_BY_TYPE` sert à la fois à reconnaître un média et à le
+  ranger dans sa catégorie.
 
 ## Formats de chat supportés
 Détails dans `js/parser.js`. L'ordre jour/mois est **déduit du fichier** (`inferDateOrder`),

@@ -1,31 +1,34 @@
-import { escapeHtml, fmt, fmtDate } from '../utils.js';
+import { escapeHtml } from '../utils.js';
+import { fmt, fmtDate, stripTags } from '../format.js';
+import { t } from '../i18n.js';
 
 export function overviewSlide(stats, gradient) {
+    const range = t('slide.overview.range', { from: fmtDate(stats.startDate), to: fmtDate(stats.endDate) });
     return {
         gradient,
         card: {
             gradient,
-            tag: 'Ta conversation',
-            big: { value: fmt(stats.totalMessages), label: 'messages échangés' },
-            subtitle: `Du ${fmtDate(stats.startDate)} au ${fmtDate(stats.endDate)}`,
+            tag: t('slide.overview.tag'),
+            big: { value: fmt(stats.totalMessages), label: t('slide.overview.big') },
+            subtitle: range,
             grid: [
-                [stats.participants, 'participants'],
-                [stats.totalDays, 'jours'],
-                [stats.avgPerDay, 'messages / jour'],
-                [fmt(stats.totalChars), 'caractères'],
+                [stats.participants, t('units.participants')],
+                [stats.totalDays, t('units.days')],
+                [stats.avgPerDay, t('units.perDay')],
+                [fmt(stats.totalChars), t('units.chars')],
             ],
         },
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Ta conversation</span>
+                <span class="slide-tag">${t('slide.overview.tag')}</span>
                 <div class="big-number">${fmt(stats.totalMessages)}</div>
-                <div class="big-label">messages échangés</div>
-                <p class="slide-subtitle">Du ${fmtDate(stats.startDate)} au ${fmtDate(stats.endDate)}</p>
+                <div class="big-label">${t('slide.overview.big')}</div>
+                <p class="slide-subtitle">${range}</p>
                 <div class="stat-grid">
-                    <div class="stat-card"><div class="stat-value">${stats.participants}</div><div class="stat-label">participants</div></div>
-                    <div class="stat-card"><div class="stat-value">${stats.totalDays}</div><div class="stat-label">jours</div></div>
-                    <div class="stat-card"><div class="stat-value">${stats.avgPerDay}</div><div class="stat-label">messages / jour</div></div>
-                    <div class="stat-card"><div class="stat-value">${fmt(stats.totalChars)}</div><div class="stat-label">caractères</div></div>
+                    <div class="stat-card"><div class="stat-value">${stats.participants}</div><div class="stat-label">${t('units.participants')}</div></div>
+                    <div class="stat-card"><div class="stat-value">${stats.totalDays}</div><div class="stat-label">${t('units.days')}</div></div>
+                    <div class="stat-card"><div class="stat-value">${stats.avgPerDay}</div><div class="stat-label">${t('units.perDay')}</div></div>
+                    <div class="stat-card"><div class="stat-value">${fmt(stats.totalChars)}</div><div class="stat-label">${t('units.chars')}</div></div>
                 </div>
             </div>
         `,
@@ -45,17 +48,17 @@ export function comparisonSlide(comparison, gradient) {
         gradient,
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Comparaison</span>
-                <h2 class="slide-title">Cette année vs l'année dernière</h2>
+                <span class="slide-tag">${t('slide.comparison.tag')}</span>
+                <h2 class="slide-title">${t('slide.comparison.title')}</h2>
                 <table class="compare-table">
-                    <thead><tr><th></th><th>Avant</th><th>Maintenant</th><th>Évolution</th></tr></thead>
+                    <thead><tr><th></th><th>${t('slide.comparison.before')}</th><th>${t('slide.comparison.now')}</th><th>${t('slide.comparison.change')}</th></tr></thead>
                     <tbody>
-                        ${row('Messages', comparison.messages)}
-                        ${row('Par jour', comparison.avgPerDay)}
-                        ${row('Emojis', comparison.emojis)}
-                        ${row('Médias', comparison.media)}
-                        ${comparison.avgMsgLen ? row('Longueur moy.', comparison.avgMsgLen, ' car.') : ''}
-                        ${comparison.streak ? row('Meilleur streak', comparison.streak, ' j') : ''}
+                        ${row(t('slide.comparison.messages'), comparison.messages)}
+                        ${row(t('slide.comparison.perDay'), comparison.avgPerDay)}
+                        ${row(t('slide.comparison.emojis'), comparison.emojis)}
+                        ${row(t('slide.comparison.media'), comparison.media)}
+                        ${comparison.avgMsgLen ? row(t('slide.comparison.avgLen'), comparison.avgMsgLen, ` ${t('units.chars')}`) : ''}
+                        ${comparison.streak ? row(t('slide.comparison.streak'), comparison.streak, ` ${t('units.days')}`) : ''}
                     </tbody>
                 </table>
             </div>
@@ -76,49 +79,51 @@ export function wordsTrendSlide(comparison, gradient) {
         gradient,
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Vocabulaire</span>
-                <h2 class="slide-title">Les mots de l'année</h2>
-                ${appeared.length ? `<p style="color:var(--text-muted);font-size:0.85rem;margin-top:1rem;">Nouveaux mots ✨</p><div class="words-cloud">${newCloud}</div>` : ''}
-                ${disappeared.length ? `<p style="color:var(--text-muted);font-size:0.85rem;margin-top:1rem;">Disparus de votre top</p><div class="words-cloud">${oldCloud}</div>` : ''}
+                <span class="slide-tag">${t('slide.wordsTrend.tag')}</span>
+                <h2 class="slide-title">${t('slide.wordsTrend.title')}</h2>
+                ${appeared.length ? `<p style="color:var(--text-muted);font-size:0.85rem;margin-top:1rem;">${t('slide.wordsTrend.appeared')}</p><div class="words-cloud">${newCloud}</div>` : ''}
+                ${disappeared.length ? `<p style="color:var(--text-muted);font-size:0.85rem;margin-top:1rem;">${t('slide.wordsTrend.disappeared')}</p><div class="words-cloud">${oldCloud}</div>` : ''}
             </div>
         `,
     };
 }
 
 export function recapSlide(stats, gradient) {
+    const leader = stats.ranking[0];
+    const dominant = leader
+        ? t('slide.recap.dominant', { name: escapeHtml(leader[0]), pct: leader[1].percent })
+        : '';
     return {
         gradient,
         card: {
             gradient,
-            tag: 'Récapitulatif',
-            title: 'Votre conversation en chiffres',
+            tag: t('slide.recap.tag'),
+            title: t('slide.recap.title'),
             grid: [
-                [fmt(stats.totalMessages), 'messages'],
-                [stats.participants, 'participants'],
-                [stats.totalDays, 'jours'],
-                [fmt(stats.emojis.total), 'emojis'],
-                [fmt(stats.totalMedia), 'médias'],
-                [`${stats.streak.max}j`, 'meilleur streak'],
+                [fmt(stats.totalMessages), t('units.messages')],
+                [stats.participants, t('units.participants')],
+                [stats.totalDays, t('units.days')],
+                [fmt(stats.emojis.total), t('units.emojis')],
+                [fmt(stats.totalMedia), t('units.media')],
+                [t('format.days', { n: stats.streak.max }), t('units.bestStreak')],
             ],
-            lines: stats.ranking[0]
-                ? [`${stats.ranking[0][0]} domine avec ${stats.ranking[0][1].percent}% des messages`]
+            lines: leader
+                ? [stripTags(t('slide.recap.dominant', { name: leader[0], pct: leader[1].percent }))]
                 : [],
         },
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Récapitulatif</span>
-                <h2 class="slide-title">Votre conversation en chiffres</h2>
+                <span class="slide-tag">${t('slide.recap.tag')}</span>
+                <h2 class="slide-title">${t('slide.recap.title')}</h2>
                 <div class="stat-grid">
-                    <div class="stat-card"><div class="stat-value">${fmt(stats.totalMessages)}</div><div class="stat-label">messages</div></div>
-                    <div class="stat-card"><div class="stat-value">${stats.participants}</div><div class="stat-label">participants</div></div>
-                    <div class="stat-card"><div class="stat-value">${stats.totalDays}</div><div class="stat-label">jours</div></div>
-                    <div class="stat-card"><div class="stat-value">${fmt(stats.emojis.total)}</div><div class="stat-label">emojis</div></div>
-                    <div class="stat-card"><div class="stat-value">${fmt(stats.totalMedia)}</div><div class="stat-label">médias</div></div>
-                    <div class="stat-card"><div class="stat-value">${stats.streak.max}j</div><div class="stat-label">meilleur streak</div></div>
+                    <div class="stat-card"><div class="stat-value">${fmt(stats.totalMessages)}</div><div class="stat-label">${t('units.messages')}</div></div>
+                    <div class="stat-card"><div class="stat-value">${stats.participants}</div><div class="stat-label">${t('units.participants')}</div></div>
+                    <div class="stat-card"><div class="stat-value">${stats.totalDays}</div><div class="stat-label">${t('units.days')}</div></div>
+                    <div class="stat-card"><div class="stat-value">${fmt(stats.emojis.total)}</div><div class="stat-label">${t('units.emojis')}</div></div>
+                    <div class="stat-card"><div class="stat-value">${fmt(stats.totalMedia)}</div><div class="stat-label">${t('units.media')}</div></div>
+                    <div class="stat-card"><div class="stat-value">${t('format.days', { n: stats.streak.max })}</div><div class="stat-label">${t('units.bestStreak')}</div></div>
                 </div>
-                <p class="slide-subtitle" style="margin-top:1.5rem;">
-                    ${stats.ranking[0] ? `<strong>${escapeHtml(stats.ranking[0][0])}</strong> domine avec ${stats.ranking[0][1].percent}% des messages` : ''}
-                </p>
+                <p class="slide-subtitle" style="margin-top:1.5rem;">${dominant}</p>
                 <div class="recap-actions"></div>
             </div>
         `,

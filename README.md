@@ -20,8 +20,9 @@ dans ton navigateur, sans aucun envoi de données.
 - **Période libre** : une année, tout l'historique, ou une plage de dates au choix
 - **Dashboard** : vue tableau détaillée, filtre par participant, export CSV / JSON
 - **Analyse de sentiment** : par emojis et vocabulaire par défaut, par IA locale en option
+- **Interface multilingue** : français et anglais, détectés depuis le navigateur, changeables à tout moment
 - **100% client-side** : aucune donnée n'est envoyée à un serveur
-- **Multi-format** : exports iOS et Android, en français, anglais, espagnol et allemand
+- **Multi-format** : exports iOS et Android, en français, anglais, espagnol, allemand, portugais, italien et néerlandais
 
 ## Utilisation
 
@@ -48,6 +49,7 @@ génère une conversation fictive pour explorer le site.
 | Lecture automatique | **Espace**, ou le bouton *Lecture auto* |
 | Aller à une slide | clic sur la barre de progression en haut |
 | Partager | bouton *Partager* : image de la slide, image du récap, poster, ou lien |
+| Changer de langue | le sélecteur en bas à droite, à côté du thème |
 
 ### 4. Imprimer le poster
 
@@ -71,8 +73,10 @@ vide. À distance de bras sur un mur, l'écart est invisible.
 
 ## Vie privée
 
-Rien ne quitte l'appareil : le fichier est lu, parsé et analysé dans un Web Worker, et les
-résultats sont mis en cache dans IndexedDB.
+Rien ne quitte l'appareil : le fichier est lu **en flux**, parsé et analysé dans un Web
+Worker, et les résultats sont mis en cache dans IndexedDB. Le texte complet de la
+conversation n'existe à aucun moment en entier en mémoire — ce qui évite aussi qu'un export
+de 50 Mo fasse tuer l'onglet sur un téléphone.
 
 Deux nuances à connaître :
 
@@ -152,8 +156,11 @@ site/
     ├── stats.js           # calcul des statistiques
     ├── export-image.js    # rendu canvas des images partageables
     ├── anonymize.js       # remplacement des prénoms par des initiales
+    ├── i18n.js            # langue de l'interface, t(), traduction du HTML statique
+    ├── format.js          # nombres, dates, heures et jours selon la langue
     ├── demo.js            # conversation d'exemple générée
     ├── vendor.js          # chargement paresseux des scripts CDN
+    ├── lang/              # dictionnaires : ui/ (interface), chat-locales (exports)
     ├── slides/            # une slide par fichier
     └── ui/                # dialogues, toasts, partage, URL
 ```
@@ -165,7 +172,19 @@ site/
 - **[transformers.js](https://huggingface.co/docs/transformers.js)** — uniquement si l'analyse IA est activée
 - **Space Grotesk** — auto-hébergée, aucune requête vers Google Fonts
 
-## Formats de chat supportés
+## Langues
+
+### De l'interface
+
+Français et anglais. La langue est choisie au premier chargement dans l'ordre suivant :
+préférence enregistrée, puis `navigator.languages`, puis français. Le sélecteur en bas à
+droite la change à chaud — le deck est reconstruit sur la slide en cours, sans recalcul.
+
+Ajouter une langue tient en trois gestes : copier `js/lang/ui/fr.js`, le traduire, l'inscrire
+dans `LOCALES` (`js/i18n.js`). Les tests refusent un dictionnaire dont les clés ou les
+paramètres `{nom}` ont dérivé du français.
+
+### Des exports lus
 
 | Format | Exemple |
 |--------|---------|
@@ -173,6 +192,10 @@ site/
 | Android | `12/03/2024, 14:30 - Alice: Bonjour` |
 | Android US | `03/12/24, 2:30 PM - Alice: Hello` |
 | Android DE | `12.03.2024, 14.30 - Anna: Hallo` |
+
+Les libellés que WhatsApp écrit lui-même (« image absente », « ce message a été supprimé »,
+l'en-tête d'un sondage, la notice de chiffrement) sont reconnus en **français, anglais,
+espagnol, allemand, portugais, italien et néerlandais** — voir `js/lang/chat-locales.js`.
 
 L'ordre jour/mois est déduit du fichier entier, pas du séparateur : un export européen avec
 année sur deux chiffres (`12/03/24`) n'est plus lu comme du mois-en-premier.

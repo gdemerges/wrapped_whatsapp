@@ -1,0 +1,7 @@
+‎[15/03/2024, 14:30:00] ‎Alice: ‎Hey there
+[15/03/2024, 14:31:00] Les messages et les appels sont chiffrés de bout en bout.
+[15/03/2024, 14:32:00] Bob: SONDAGE :
+On se voit quand ?
+OPTION : samedi
+OPTION : dimanche
+[15/03/2024, 14:33:00] Alice: ‎ok‎

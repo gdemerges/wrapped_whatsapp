@@ -1,5 +1,7 @@
 /** Shared toast + screen-reader announcements. */
 
+import { t } from '../i18n.js';
+
 const toastEl = () => document.querySelector('#share-toast');
 const liveEl = () => document.querySelector('#a11y-live');
 
@@ -22,14 +24,14 @@ export function showToast(message, { error = false, duration = error ? 4000 : 22
 }
 
 export function showError(message) {
-    showToast(`Erreur : ${message}`, { error: true });
+    showToast(t('error.prefix', { message }), { error: true });
 }
 
 /**
  * Clipboard with a fallback for the browsers (and insecure origins) where the
  * async API is unavailable.
  */
-export async function copyToClipboard(text, message = 'Lien copié !') {
+export async function copyToClipboard(text, message = t('share.linkCopied')) {
     try {
         await navigator.clipboard.writeText(text);
         showToast(message);
@@ -45,7 +47,7 @@ export async function copyToClipboard(text, message = 'Lien copié !') {
         try { ok = document.execCommand('copy'); } catch { ok = false; }
         ta.remove();
         if (ok) showToast(message);
-        else showError('Copie impossible, copie le lien manuellement');
+        else showError(t('share.copyFailed'));
         return ok;
     }
 }

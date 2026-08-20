@@ -1,4 +1,6 @@
-import { escapeHtml, fmt } from '../utils.js';
+import { escapeHtml } from '../utils.js';
+import { fmt } from '../format.js';
+import { t } from '../i18n.js';
 import { CHART_COLORS } from './_constants.js';
 import { rankingBars, monthLabels } from './_helpers.js';
 import { barsFrom } from './_card.js';
@@ -11,14 +13,14 @@ export function topMessagersSlide(stats, gradient) {
         gradient,
         card: {
             gradient,
-            tag: 'Classement',
-            title: 'Les plus bavard·e·s',
+            tag: t('slide.ranking.tag'),
+            title: t('slide.ranking.title'),
             bars: barsFrom(top10, r => r[1].count, r => `${fmt(r[1].count)} · ${r[1].percent}%`),
         },
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Classement</span>
-                <h2 class="slide-title">Les plus bavard·e·s</h2>
+                <span class="slide-tag">${t('slide.ranking.tag')}</span>
+                <h2 class="slide-title">${t('slide.ranking.title')}</h2>
                 <div class="ranking-list">${rankingBars(top10, r => r[1].count, r => `${fmt(r[1].count)} (${r[1].percent}%)`, maxCount)}</div>
             </div>
         `,
@@ -30,8 +32,8 @@ export function pieSlide(stats, gradient) {
         gradient,
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Répartition</span>
-                <h2 class="slide-title">Qui parle le plus ?</h2>
+                <span class="slide-tag">${t('slide.pie.tag')}</span>
+                <h2 class="slide-title">${t('slide.pie.title')}</h2>
                 <div class="chart-wrapper" style="max-width:350px;margin:1.5rem auto;">
                     <canvas id="chart-pie" height="350"></canvas>
                 </div>
@@ -42,7 +44,7 @@ export function pieSlide(stats, gradient) {
             const othersCount = stats.ranking.slice(8).reduce((s, r) => s + r[1].count, 0);
             const labels = topN.map(r => r[0]);
             const data = topN.map(r => r[1].count);
-            if (othersCount > 0) { labels.push('Autres'); data.push(othersCount); }
+            if (othersCount > 0) { labels.push(t('common.others')); data.push(othersCount); }
             makeChart(ctx, {
                 type: 'doughnut',
                 data: { labels, datasets: [{ data, backgroundColor: CHART_COLORS.slice(0, labels.length), borderWidth: 2, borderColor: 'rgba(0,0,0,0.3)' }] },
@@ -58,7 +60,7 @@ export function pieSlide(stats, gradient) {
 
 export function evolutionPerPersonSlide(stats, gradient) {
     const allAuthors = stats.ranking.map(r => r[0]);
-    const filterBtns = ['Tous', ...allAuthors].map((name, i) => {
+    const filterBtns = [t('common.all'), ...allAuthors].map((name, i) => {
         const active = i === 0 ? ' active' : '';
         return `<button class="filter-btn${active}" data-filter="${i === 0 ? '__all__' : escapeHtml(name)}">${escapeHtml(name)}</button>`;
     }).join('');
@@ -67,8 +69,8 @@ export function evolutionPerPersonSlide(stats, gradient) {
         gradient,
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Évolution</span>
-                <h2 class="slide-title">Qui parle quand ?</h2>
+                <span class="slide-tag">${t('slide.evolution.tag')}</span>
+                <h2 class="slide-title">${t('slide.evolution.title')}</h2>
                 <div class="filter-bar" id="evolution-filters">${filterBtns}</div>
                 <div class="chart-wrapper"><canvas id="chart-evolution" height="300"></canvas></div>
             </div>
@@ -129,17 +131,17 @@ export function messageLengthSlide(stats, gradient) {
         gradient,
         card: {
             gradient,
-            tag: 'Longueur',
-            title: 'Qui écrit les plus longs messages ?',
-            subtitle: 'Longueur moyenne par message, en caractères',
-            bars: barsFrom(avgLenRanking, r => r[1].avgLen, r => `${r[1].avgLen} car.`),
+            tag: t('slide.length.tag'),
+            title: t('slide.length.title'),
+            subtitle: t('slide.length.subtitle'),
+            bars: barsFrom(avgLenRanking, r => r[1].avgLen, r => t('format.chars', { n: r[1].avgLen })),
         },
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Longueur</span>
-                <h2 class="slide-title">Qui écrit les plus longs messages ?</h2>
-                <p class="slide-subtitle">Longueur moyenne par message (en caractères)</p>
-                <div class="ranking-list">${rankingBars(avgLenRanking, r => r[1].avgLen, r => `${r[1].avgLen} car.`, maxAvgLen)}</div>
+                <span class="slide-tag">${t('slide.length.tag')}</span>
+                <h2 class="slide-title">${t('slide.length.title')}</h2>
+                <p class="slide-subtitle">${t('slide.length.subtitle')}</p>
+                <div class="ranking-list">${rankingBars(avgLenRanking, r => r[1].avgLen, r => t('format.chars', { n: r[1].avgLen }), maxAvgLen)}</div>
             </div>
         `,
     };
@@ -158,7 +160,7 @@ export function initiatorSlide(stats, gradient) {
             <div class="ranking-item">
                 <div class="ranking-pos ${posClass}">${i + 1}</div>
                 <div class="ranking-bar-wrapper">
-                    <div class="ranking-bar-label"><span class="name">${escapeHtml(name)}</span><span class="value">${n} jours (${pct}%)</span></div>
+                    <div class="ranking-bar-label"><span class="name">${escapeHtml(name)}</span><span class="value">${t('slide.initiator.daysPct', { n, pct })}</span></div>
                     <div class="ranking-bar"><div class="ranking-bar-fill" style="--bar-width: ${w}%; background: ${color};"></div></div>
                 </div>
             </div>`;
@@ -167,16 +169,16 @@ export function initiatorSlide(stats, gradient) {
         gradient,
         card: {
             gradient,
-            tag: 'Initiative',
-            title: 'Qui lance la conversation ?',
-            subtitle: 'Jours où cette personne a envoyé le premier message',
-            bars: barsFrom(stats.initiator, e => e[1], e => `${e[1]} jours`),
+            tag: t('slide.initiator.tag'),
+            title: t('slide.initiator.title'),
+            subtitle: t('slide.initiator.subtitle'),
+            bars: barsFrom(stats.initiator, e => e[1], e => t('slide.initiator.days', { n: e[1] })),
         },
         html: `
             <div class="slide-inner">
-                <span class="slide-tag">Initiative</span>
-                <h2 class="slide-title">Qui lance la conversation ?</h2>
-                <p class="slide-subtitle">Nombre de jours où cette personne a envoyé le premier message</p>
+                <span class="slide-tag">${t('slide.initiator.tag')}</span>
+                <h2 class="slide-title">${t('slide.initiator.title')}</h2>
+                <p class="slide-subtitle">${t('slide.initiator.subtitle')}</p>
                 <div class="ranking-list">${bars}</div>
             </div>
         `,

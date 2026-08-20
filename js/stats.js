@@ -3,8 +3,9 @@
  * Single-pass where possible.
  */
 
-import { DAYS_FR, localDayKey, localMonthKey } from './utils.js';
+import { localDayKey, localMonthKey } from './utils.js';
 import { stopwordsFor, detectLanguage } from './lang/stopwords.js';
+import { MEDIA_BY_TYPE } from './lang/chat-locales.js';
 
 const EMOJI_RE = /\p{Extended_Pictographic}\uFE0F?(?:\u200D\p{Extended_Pictographic}\uFE0F?)*/gu;
 const WORD_RE = /[a-zàâäéèêëïîôùûüÿçœæ']+/gi;
@@ -13,13 +14,19 @@ const URL_TEST_RE = /https?:\/\/\S+/;
 const HTML_STRIP_RE = /<[^>]+>/g;
 const GHOST_THRESHOLD_MIN = 60 * 24; // 24h = ghosted
 
+/** Tag an error with a stable code the UI can translate. @see js/parser.js */
+function coded(err, code) {
+    /** @type {any} */ (err).code = code;
+    return err;
+}
+
 /**
  * @param {import('./types.d.ts').Message[]} messages
  * @returns {import('./types.d.ts').Stats}
  */
 export function compute(messages) {
     if (!messages || messages.length === 0) {
-        throw new Error('Aucun message à analyser');
+        throw coded(new Error('Aucun message à analyser'), 'noMessages');
     }
 
     // Ensure chronological order
@@ -53,6 +60,13 @@ export function compute(messages) {
 
         const person = stats.perPerson[author] ||= newPerson();
 
+        // --- Deleted messages ---
+        // The tombstone is not a message anyone wrote. It still happened, so
+        // it counts towards the totals and the timeline, but everything
+        // content-derived below (words, emojis, length, links) skips it — the
+        // parser has already blanked its body.
+        if (m.isDeleted) { stats.totalDeleted++; person.deleted++; }
+
         // --- Counts & lengths ---
         stats.totalMessages++;
         stats.totalChars += m.msgLen;
@@ -63,6 +77,8 @@ export function compute(messages) {
             stats.totalMedia++;
             person.media++;
             bucketMediaType(stats.mediaTypes, m.message);
+        } else if (m.isDeleted) {
+            // no text to mine, and no length worth averaging
         } else {
             stats.textCount++;
             stats.textChars += m.msgLen;
@@ -183,6 +199,7 @@ function initAccumulators() {
         textChars: 0,
         totalMedia: 0,
         totalEdited: 0,
+        totalDeleted: 0,
         totalLinks: 0,
         totalEmojis: 0,
         perPerson: {},
@@ -213,6 +230,7 @@ function newPerson() {
         textChars: 0,
         media: 0,
         edited: 0,
+        deleted: 0,
         links: 0,
         emojis: 0,
         nightMsgs: 0,
@@ -225,13 +243,19 @@ function newPerson() {
     };
 }
 
+/**
+ * Attribute a media placeholder to its type, in every supported language.
+ *
+ * `other` is skipped on purpose: "<Médias omis>" says a file was there, not
+ * what it was, so it counts in the total and in no bucket.
+ */
+const MEDIA_BUCKETS = Object.entries(MEDIA_BY_TYPE).filter(([type]) => type !== 'other');
+
 function bucketMediaType(mediaTypes, msg) {
-    if (/image absente|image omitted/i.test(msg)) mediaTypes.images++;
-    else if (/GIF retiré|GIF omitted/i.test(msg)) mediaTypes.gifs++;
-    else if (/sticker omis|sticker omitted/i.test(msg)) mediaTypes.stickers++;
-    else if (/vidéo absente|video omitted/i.test(msg)) mediaTypes.videos++;
-    else if (/audio omis|audio omitted/i.test(msg)) mediaTypes.audio++;
-    else if (/document omis|document omitted/i.test(msg)) mediaTypes.documents++;
+    const lower = msg.toLowerCase();
+    for (const [type, needles] of MEDIA_BUCKETS) {
+        if (needles.some(n => lower.includes(n))) { mediaTypes[type]++; return; }
+    }
 }
 
 function finalize(acc, messages) {
@@ -248,6 +272,7 @@ function finalize(acc, messages) {
             percent: ((p.count / acc.totalMessages) * 100).toFixed(1),
             media: p.media,
             edited: p.edited,
+            deleted: p.deleted,
             emojis: p.emojis,
             links: p.links,
             totalChars: p.totalChars,
@@ -319,7 +344,9 @@ function finalize(acc, messages) {
 
     // Peak hour/day
     const peakHour = acc.hourly.indexOf(Math.max(...acc.hourly));
-    const peakDay = DAYS_FR[acc.weekday.indexOf(Math.max(...acc.weekday))];
+    // Stored as an index, not a name: the label is the UI's business, and a
+    // stats payload that hard-codes "Mardi" cannot be shown in English.
+    const peakDayIndex = acc.weekday.indexOf(Math.max(...acc.weekday));
 
     // Night owl / early bird
     const nightOwlE = Object.entries(perPerson).map(([n, p]) => [n, p.nightMsgs])
@@ -364,6 +391,7 @@ function finalize(acc, messages) {
         totalChars: acc.totalChars,
         totalMedia: acc.totalMedia,
         totalEdited: acc.totalEdited,
+        totalDeleted: acc.totalDeleted,
         totalLinks: acc.totalLinks,
         avgMsgLen: acc.textCount > 0 ? Math.round(acc.textChars / acc.textCount) : 0,
         participants: Object.keys(perPerson).length,
@@ -376,7 +404,7 @@ function finalize(acc, messages) {
         monthly: acc.monthly,
         monthlyPerPerson: acc.monthlyPerPerson,
         peakHour,
-        peakDay,
+        peakDayIndex,
         mostActiveDay,
         topWords,
         topWordsPerPerson,
